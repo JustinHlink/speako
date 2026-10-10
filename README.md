@@ -91,3 +91,5 @@ See `docs/live-api-check.json` and `docs/live-feedback-check.json` for non-perso
 If site permission is allowed but recording fails, compare the same local URL (`http://127.0.0.1:8001/`) in a standalone Chrome or Edge window. Embedded browser access and Windows permission may differ from the site's permission. In Windows Settings > Privacy & security > Microphone, enable microphone access, app access and desktop app access. Check System > Sound > Input for the selected device. No audio or Gemini request is sent when microphone startup fails.
 
 The page now distinguishes access blocking, missing devices and device startup failures. An access-blocked error alone cannot identify which permission layer rejected the request. Human microphone verification remains pending.
+
+Supportive beginner language (for example, "No problem" and "Try") is allowed alongside lesson target words. Unsure learners should receive menu choices; off-topic answers should receive gentle redirection without being labeled incorrect. Output validation failures refer to the AI reply, not the learner’s English. This does not guarantee every generated reply will pass vocabulary validation.

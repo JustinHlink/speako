@@ -96,6 +96,26 @@ class WorkflowTests(TestCase):
         self.assertEqual(self.reply().status_code, 502)
         self.assertEqual(provider.call_count, 1)
 
+    @patch('practice.gemini.generate', return_value={**GOOD, 'reply': 'No problem. Try chicken with rice or soup.'})
+    def test_unsure_learner_receives_guidance_without_a_correction(self, provider):
+        self.pending("I don't know, I don't know.")
+        response = self.reply()
+        self.assertEqual(response.status_code, 200)
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.pending, '')
+        self.assertEqual(len(self.session.turns), 1)
+        self.assertIsNone(self.session.turns[0]['correction'])
+        self.assertEqual(self.session.turns[0]['reply'], 'No problem. Try chicken with rice or soup.')
+        self.assertEqual(provider.call_count, 1)
+
+    @patch('practice.gemini.generate', return_value={**GOOD, 'reply': 'No problem. Would you like chicken or soup?', 'off_topic': True})
+    def test_off_topic_answer_can_receive_gentle_redirection(self, provider):
+        self.pending('I like football.')
+        self.assertEqual(self.reply().status_code, 200)
+        self.session.refresh_from_db()
+        self.assertTrue(self.session.turns[0]['off_topic'])
+        self.assertIsNone(self.session.turns[0]['correction'])
+
     def test_another_browser_cannot_see_session(self):
         self.assertIsNone(Client().get('/api/status/').json()['session'])
 
