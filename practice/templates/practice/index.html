@@ -1,0 +1,50 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speako · Restaurant practice</title>
+  <link rel="stylesheet" href="{% static 'practice/app.css' %}">
+  <script defer src="{% static 'practice/app.js' %}"></script>
+</head>
+<body>
+  <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local prototype · v0.1</span></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's order something.</h1><p class="subtitle">Practice a simple restaurant conversation, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
+    <div id="setup" class="setup" role="status" hidden></div>
+    <div class="workspace">
+      <aside class="lesson-card">
+        <div class="restaurant-icon" aria-hidden="true">☕</div><p class="eyebrow">YOUR SCENARIO</p><h2>Ordering at a Restaurant</h2>
+        <p id="goal">Order food and a drink politely, then ask for the bill.</p>
+        <div class="lesson-meta"><span>Beginner English</span><span>5 exchanges</span></div>
+        <h3>Today's menu</h3><ul class="menu"><li>Chicken with rice</li><li>Soup</li><li>Water</li><li>Tea</li></ul>
+        <h3>Target words</h3><div id="vocabulary" class="word-list"></div>
+        <p class="grammar">Try: “I would like…” or “Can I have…?”</p>
+        <button id="start" class="primary">Start practice <span aria-hidden="true">→</span></button>
+        <p class="quiet">Check the transcript before the AI evaluates your answer. No pronunciation grading.</p>
+      </aside>
+      <section class="conversation-card" aria-labelledby="conversation-heading">
+        <div class="conversation-top"><div><p class="eyebrow">YOUR AI PARTNER</p><h2 id="conversation-heading">The restaurant waiter</h2></div><span id="progress" class="progress">Ready to begin</span></div>
+        <div id="messages" class="messages" aria-live="polite"><div class="empty"><span class="empty-symbol" aria-hidden="true">“</span><h3>A little practice goes a long way.</h3><p>Start the lesson. Listen to your waiter, then record your reply.</p></div></div>
+        <div class="reply-tools"><button id="repeat" class="secondary" disabled>Repeat slower</button><div id="time-playback" class="timing">Playback start · — / target ≤ 1 s</div></div>
+        <div id="summary" class="summary" hidden></div>
+        <div id="transcript" class="transcript" hidden><div class="row"><h3>Did we hear you correctly?</h3></div><p id="transcript-text"></p><div class="row"><div><button id="confirm" class="primary">Continue</button><button id="discard" class="secondary">Try again</button></div><div id="time-confirmation" class="timing">Your review time · — (no limit)</div></div></div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div class="recording-panel"><div class="row"><div class="state"><span id="state-dot" class="state-dot"></span><span id="state" role="status">Start a lesson to speak</span></div><div id="time-microphone" class="timing">Mic ready · — / target ≤ 1 s</div></div>
+          <div class="meter" aria-hidden="true"><div id="meter-fill"></div></div>
+          <div class="record-actions"><button id="record" class="primary" disabled>Record answer</button><button id="stop" class="danger" disabled>Stop recording</button><span id="record-duration">Up to 30 seconds</span></div>
+          <div class="row timing-row"><div id="time-transcription" class="timing">Recognition · — / target ≤ 5 s</div><div id="time-ai_reply" class="timing">AI response · — / target ≤ 5 s</div><div id="time-system_total" class="timing">System wait · — / target ≤ 11 s</div></div>
+          <button id="exit" class="text-button" disabled>Exit lesson</button>
+        </div>
+      </section>
+    </div>
+    <section class="test-panel"><div class="row"><div><p class="eyebrow">DEVELOPMENT & INSTRUCTOR REVIEW</p><h2>Timing and project budget</h2></div><button id="export" class="secondary">Export test measurements</button></div>
+      <p class="quiet">Suggested targets for comparison, not proven performance. Human speaking and confirmation time are shown separately. Failed attempts are also recorded.</p>
+      <div class="budget-row"><div><span class="metric-label">Whole-project ceiling</span><strong>$10.00</strong><small>Development + testing + instructor review</small></div><div><span class="metric-label">Local usage guard</span><strong id="guard">$0.00</strong><small>Conservative allowance, not actual billed spend</small></div><div><span class="metric-label">Gemini attempts</span><strong id="attempts">0</strong><small>Speech recognition and conversation only</small></div><div><span class="metric-label">Tokens reported</span><strong id="tokens">0</strong><small>Input + output, across all local sessions</small></div></div>
+      <p id="billing-note" class="quiet">Actual provider spend must be checked in Google AI Studio. Free-tier mode never enables billing.</p>
+      <details><summary>Measurement history</summary><div class="table-scroll"><table><thead><tr><th>Step</th><th>Actual</th><th>Suggested target</th><th>Result</th></tr></thead><tbody id="measurements"></tbody></table></div></details>
+    </section>
+    <footer>One fixed scenario · No login in this milestone · Summaries use this session's confirmed answers</footer>
+  </main>
+</body>
+</html>
