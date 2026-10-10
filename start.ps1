@@ -8,5 +8,6 @@ if (-not (Test-Path -LiteralPath $speakoPython)) {
 }
 & $speakoPython manage.py migrate --noinput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Write-Host 'Speako runs locally at http://127.0.0.1:8000/ . Keep this window open; Ctrl+C stops it.'
-& $speakoPython manage.py runserver 127.0.0.1:8000 --insecure --noreload
+Write-Host 'Speako runs locally at http://127.0.0.1:8001/ . Keep this window open; Ctrl+C stops it.'
+& $speakoPython manage.py runserver 127.0.0.1:8001 --insecure --noreload
+

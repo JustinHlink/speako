@@ -1,0 +1,39 @@
+{
+  "method": "Real Gemini conversation calls with controlled confirmed-text fixtures; does not test microphone or transcription.",
+  "date": "2026-10-10",
+  "checks": [
+    {
+      "input": "I would likes tea please.",
+      "status": 200,
+      "elapsed_ms": 1312,
+      "turns": [
+        {
+          "learner": "I would likes tea please.",
+          "reply": "Certainly. Would you like some food with your tea?",
+          "correction": {
+            "explanation": "Use would like without the s.",
+            "example": "I would like tea please."
+          },
+          "off_topic": false,
+          "outside_words": []
+        }
+      ],
+      "error": null
+    },
+    {
+      "input": "I like football.",
+      "status": 200,
+      "elapsed_ms": 872,
+      "turns": [
+        {
+          "learner": "I like football.",
+          "reply": "Hello. I am a waiter at this restaurant. Would you like to order some food or a drink?",
+          "correction": null,
+          "off_topic": true,
+          "outside_words": []
+        }
+      ],
+      "error": null
+    }
+  ]
+}

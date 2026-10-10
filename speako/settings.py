@@ -35,8 +35,9 @@ SESSION_COOKIE_SAMESITE = 'Strict'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash-lite')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
 GEMINI_FREE_TIER_CONFIRMED = os.environ.get('GEMINI_FREE_TIER_CONFIRMED', 'false').lower() == 'true'
 PROJECT_BUDGET_USD = float(os.environ.get('PROJECT_BUDGET_USD', '10'))
 RECORDED_EXTERNAL_SPEND_USD = float(os.environ.get('RECORDED_EXTERNAL_SPEND_USD', '0'))
 MAX_API_ATTEMPTS = int(os.environ.get('MAX_API_ATTEMPTS', '500'))
+

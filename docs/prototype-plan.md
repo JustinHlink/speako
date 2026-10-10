@@ -45,7 +45,7 @@ flowchart TD
 
 ## Requirements review
 - US-05: fixed vocabulary and grammar configuration; block an empty vocabulary list. The 90% allowed-vocabulary target still needs measured validation.
-- US-09: visible recording and processing states, audio activity feedback, and microphone permission handling. Explicit click-to-record behavior needs team agreement against the automatic microphone wording in AC i.
+- US-09: visible recording and processing states, audio activity feedback, and microphone permission handling. Jingyi approved explicit click-to-record for this prototype; clarify the automatic microphone wording with the team before declaring the full acceptance criterion complete.
 - US-10: one lesson card with topic, goal and vocabulary. A complete learning map is deferred.
 - US-11 and US-12: the core confirmation and feedback behavior is included.
 - US-04: include slower replay; disable it until the first AI line exists.
@@ -64,3 +64,6 @@ flowchart TD
 - Main contains validated versions. Develop features on a feature branch, make focused commits, and tag the verified first prototype v0.1.0.
 - Exclude credentials, recordings, databases, virtual environments and temporary outputs from Git.
 - Do not claim the entire Requirements MVP is complete after this prototype.
+
+## Agreed measurement plan
+The project ceiling is $10 total across development, testing and instructor review. Only transcription and conversational feedback may use Gemini. Use free-tier mode and do not enable billing. Suggested timing tags: page-ready 1.5 s, mic-ready 1 s, recognition 5 s, AI response 5 s, playback start 1 s, local summary 0.5 s, system wait 11 s. Show actual and target next to each relevant step. Record failed attempts and separate learner speaking/review time. Measure the 50-turn spike before accepting these targets as achieved.

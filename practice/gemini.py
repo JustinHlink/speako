@@ -19,8 +19,8 @@ def ready():
         return False, 'Add your Gemini API key to the local .env file, then restart Django.'
     if not settings.GEMINI_FREE_TIER_CONFIRMED:
         return False, 'Check that your API project has no billing enabled, then set GEMINI_FREE_TIER_CONFIRMED=true in .env.'
-    if settings.GEMINI_MODEL != 'gemini-2.5-flash-lite':
-        return False, 'This version allows only gemini-2.5-flash-lite. Review pricing before changing models.'
+    if settings.GEMINI_MODEL != 'gemini-3.1-flash-lite':
+        return False, 'This version allows only gemini-3.1-flash-lite. Review pricing before changing models.'
     return True, ''
 
 
@@ -64,12 +64,13 @@ def generate(purpose, parts, system, schema):
         attempt.prompt_tokens = max(0, int(metadata.get('promptTokenCount', 0)))
         attempt.output_tokens = max(0, int(metadata.get('candidatesTokenCount', 0))) + max(0, int(metadata.get('thoughtsTokenCount', 0)))
         # Audio-rate pricing for ALL input tokens is deliberately conservative.
-        attempt.guard_usd = max(0.02, (attempt.prompt_tokens * 0.30 + attempt.output_tokens * 0.40) / 1_000_000)
+        attempt.guard_usd = max(0.02, (attempt.prompt_tokens * 0.50 + attempt.output_tokens * 1.50) / 1_000_000)
         content = ''.join(p.get('text', '') for p in data.get('candidates', [{}])[0].get('content', {}).get('parts', []))
         result = json.loads(content)
         if not isinstance(result, dict):
             raise ValueError('Expected object')
         attempt.status = 'success'
+        result['_api_attempt_id'] = attempt.pk
         return result
     except urllib.error.HTTPError as exc:
         attempt.status = f'http_{exc.code}'
@@ -87,3 +88,4 @@ def generate(purpose, parts, system, schema):
     finally:
         attempt.elapsed_ms = (time.perf_counter() - begun) * 1000
         attempt.save()
+

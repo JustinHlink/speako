@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-10",
+  "method": "Synthetic English audio from Windows speech synthesis, real Gemini API, Django endpoint test client. Not a human microphone or full browser test.",
+  "model": "gemini-3.1-flash-lite",
+  "completed": true,
+  "exchanges": [
+    {
+      "exchange": 1,
+      "transcription_status": 200,
+      "transcription_ms": 7087,
+      "transcript": "I would like chicken and water please",
+      "reply_status": 200,
+      "reply_ms": 1160,
+      "accepted_turn": {
+        "learner": "I would like chicken and water please",
+        "reply": "Certainly. Would you like soup with your meal?",
+        "correction": null,
+        "off_topic": false,
+        "outside_words": []
+      }
+    },
+    {
+      "exchange": 2,
+      "transcription_status": 200,
+      "transcription_ms": 13929,
+      "transcript": "No thank you",
+      "reply_status": 200,
+      "reply_ms": 830,
+      "accepted_turn": {
+        "learner": "No thank you",
+        "reply": "Okay. Can I get you anything else today?",
+        "correction": null,
+        "off_topic": false,
+        "outside_words": []
+      }
+    },
+    {
+      "exchange": 3,
+      "transcription_status": 200,
+      "transcription_ms": 4930,
+      "transcript": "I would like tea please.",
+      "reply_status": 200,
+      "reply_ms": 861,
+      "accepted_turn": {
+        "learner": "I would like tea please.",
+        "reply": "Certainly. Would you like your tea hot or cold?",
+        "correction": null,
+        "off_topic": false,
+        "outside_words": []
+      }
+    },
+    {
+      "exchange": 4,
+      "transcription_status": 200,
+      "transcription_ms": 4466,
+      "transcript": "I would like rice please",
+      "reply_status": 200,
+      "reply_ms": 838,
+      "accepted_turn": {
+        "learner": "I would like rice please",
+        "reply": "Certainly. Would you like the chicken with your rice?",
+        "correction": null,
+        "off_topic": false,
+        "outside_words": []
+      }
+    },
+    {
+      "exchange": 5,
+      "transcription_status": 200,
+      "transcription_ms": 1542,
+      "transcript": "Can I have the bill please?",
+      "reply_status": 200,
+      "reply_ms": 733,
+      "accepted_turn": {
+        "learner": "Can I have the bill please?",
+        "reply": "Certainly. Thank you for your order and enjoy your meal.",
+        "correction": null,
+        "off_topic": false,
+        "outside_words": []
+      }
+    }
+  ],
+  "usage": {
+    "attempts": 15,
+    "guard_usd": 0.3,
+    "external_spend_usd": 0.0,
+    "budget_usd": 10.0,
+    "prompt_tokens": 4705,
+    "output_tokens": 398,
+    "billing_note": "Free-tier assumption. Local guard is not an invoice; verify actual usage in AI Studio."
+  },
+  "summary": {
+    "used": [
+      "chicken",
+      "rice",
+      "water",
+      "tea",
+      "bill",
+      "please"
+    ],
+    "unused": [
+      "menu",
+      "soup"
+    ],
+    "corrections": []
+  },
+  "summary_ms": 2.0761000050697476
+}

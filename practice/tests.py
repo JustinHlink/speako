@@ -115,7 +115,7 @@ class WorkflowTests(TestCase):
             provider.assert_not_called()
 
 
-@override_settings(GEMINI_API_KEY='test-only-not-a-real-key', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-2.5-flash-lite', PROJECT_BUDGET_USD=10, RECORDED_EXTERNAL_SPEND_USD=0)
+@override_settings(GEMINI_API_KEY='test-only-not-a-real-key', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite', PROJECT_BUDGET_USD=10, RECORDED_EXTERNAL_SPEND_USD=0)
 class BudgetTests(TestCase):
     def test_only_two_api_purposes_allowed(self):
         with self.assertRaises(ProviderError):
@@ -152,3 +152,4 @@ class SummaryTests(TestCase):
         self.assertEqual(summary['used'], ['chicken'])
         self.assertIn('water', summary['unused'])
         self.assertEqual(len(summary['corrections']), 1)
+

@@ -11,11 +11,16 @@ LESSON = {
 }
 BEGINNER_WORDS = set('a an the i you he she it we they me my your our is are am was were be been have has had do does did can could would will want like need order eat drink food yes no not and or but so with without for to from of in on at this that these those here there hello hi welcome thank thanks good great sure okay ok what how which some any one two three more anything else today ready take get bring enjoy much cost dollars please lets let us now goodbye'.split())
 ALLOWED = BEGINNER_WORDS | set(LESSON['target_words'])
+ALLOWED |= set('certainly right away coming meal small large hot cold sorry use say sentence polite request word words instead add after before correct restaurant waiter'.split())
 TARGETS = {'microphone': 1000, 'transcription': 5000, 'ai_reply': 5000, 'playback': 1000, 'summary': 500, 'page_ready': 1500, 'system_total': 11000}
 
 
 def words(text):
-    return re.findall(r"[a-z]+", text.lower().replace('’', "'"))
+    text = text.lower().replace('’', "'")
+    contractions = {"i'm": 'i am', "i'd": 'i would', "i'll": 'i will', "don't": 'do not', "can't": 'can not', "you're": 'you are', "it's": 'it is', "that's": 'that is', "we're": 'we are', "let's": 'let us'}
+    for short, expanded in contractions.items():
+        text = re.sub(r'\b' + re.escape(short) + r'\b', expanded, text)
+    return re.findall(r"[a-z]+", text)
 
 
 def outside_words(text):

@@ -13,7 +13,7 @@ Project folder: `C:\Users\Justin\Desktop\SE\speako`.
    ```
 2. Copy `.env.example` to `.env` if `.env` does not already exist. In Google AI Studio create an API key for a project with **no Cloud Billing enabled**. Enter it only in the local `.env` file. Set `GEMINI_FREE_TIER_CONFIRMED=true` after checking that project's free-tier status. Do not paste keys into chat or commit them.
 3. Double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`.
-4. Open `http://127.0.0.1:8000/` in current Chrome or Edge. Allow the microphone when you choose Record. Keep the terminal open. Stop with Ctrl+C. Restart after changing `.env`.
+4. Open `http://127.0.0.1:8001/` in current Chrome or Edge. Allow the microphone when you choose Record. Keep the terminal open. Stop with Ctrl+C. Restart after changing `.env`.
 
 Without a key the real application opens and explains setup; it never substitutes scripted AI responses. There is no login, deployment, reviewer dashboard or curator editor in this milestone. Browser-local sessions persist in SQLite; this is not account-based progress.
 
@@ -30,9 +30,9 @@ Without a key the real application opens and explains setup; it never substitute
 
 Gemini is used **only for transcription and conversational replies/corrections**. No image generation, search, translation, summary generation or UI creation calls. Playback uses browser speech synthesis. Audio is sent to Gemini for transcription and is not stored in project files.
 
-Default model: `gemini-2.5-flash-lite`. No paid models or automatic billing fallback. Your subscription to the Gemini app is separate from API billing. The app cannot inspect or disable your Google Cloud billing account; you must confirm the API project is unbilled. Official free-tier services may have data-use conditions; check the provider terms before recording personal information.
+Default model: `gemini-3.1-flash-lite`. No paid models or automatic billing fallback. Your subscription to the Gemini app is separate from API billing. The app cannot inspect or disable your Google Cloud billing account; you must confirm the API project is unbilled. Official free-tier services may have data-use conditions; check the provider terms before recording personal information.
 
-The budget is **$10 total across development, testing and instructor review**, not per session. SQLite records all network attempts, including failed/invalid ones, across local sessions. Each attempt reserves at least $0.02 from a conservative local guard. Successful token counts use paid-price-equivalent rates of $0.30/M input tokens (audio rate used conservatively for all input) and $0.40/M output tokens. This is **not an invoice or a claim of actual spending**. Model rates were checked against official documentation on October 10, 2026.
+The budget is **$10 total across development, testing and instructor review**, not per session. SQLite records all network attempts, including failed/invalid ones, across local sessions. Each attempt reserves at least $0.02 from a conservative local guard. Successful token counts use paid-price-equivalent rates of $0.50/M input tokens (audio rate used conservatively for all input) and $1.50/M output tokens. This is **not an invoice or a claim of actual spending**. Model rates were checked against official documentation on October 10, 2026.
 
 `RECORDED_EXTERNAL_SPEND_USD` can account for usage outside this app. Calls stop before the next local reservation would exceed $10 or the configured attempt limit. Do not delete `db.sqlite3` to reset the ledger. If teammates use separate copies, their ledgers are separate: consolidate exported measurements and actual provider usage for the whole project. Verify actual charges in AI Studio; a local guard cannot guarantee a provider-wide billing cap.
 
@@ -65,7 +65,8 @@ Tests mock the provider and make no API calls. They verify discard behavior, ret
 
 - `main`: validated local milestones; features are developed on a separate branch.
 - Focused commits separate project setup, core conversation, UI/measurement and verification.
-- `v0.1.0`: code-complete first prototype; live API validation is reported separately.
+- `v0.1.0`: initial code-complete prototype before live API validation.
+- `v0.1.1`: configured free-tier model, working local port, real five-exchange API validation and feedback checks. Human microphone and broad latency validation remain pending.
 - `.env`, `.django-secret`, recordings, databases and virtual environments never enter Git.
 - To inspect a version without losing changes: `git status`, then `git switch -c inspect-v0.1.0 v0.1.0` with a clean working tree.
 - To undo a published commit, use `git revert <commit>` and push the new undo commit. Avoid force-pushing shared history.
@@ -75,3 +76,12 @@ Tests mock the provider and make no API calls. They verify discard behavior, ret
 This is the one-scenario spike, not the full requirements MVP. US-11 and US-12 are central. US-04 slower replay and a subset of US-05/09/10/18 are implemented. Account-based US-16, review US-06/13, help US-17, curator authoring US-19 and four additional scenarios remain. US-07 specifically names Customs; the restaurant scenario does not complete it. AI vocabulary screening blocks replies/examples outside the configured lists, but factual correction quality still requires human review. The full five-lesson 90% requirement has not been verified.
 
 Sources: [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing), [Generate content API](https://ai.google.dev/api/generate-content), [Django 5.2](https://docs.djangoproject.com/en/5.2/).
+
+## Observed live results (October 10, 2026)
+
+Five synthetic English sample recordings completed the real transcription -> confirmation endpoint -> AI feedback -> persisted summary flow. The summary correctly listed used and unused words. Recognition ranged from 1.54 to 13.93 seconds in that run: two of five recognition steps exceeded the 5-second comparison target. AI replies ranged from 0.73 to 1.16 seconds; local summary calculation/save took about 2 ms. This is a small controlled sample, not a 50-turn spike or a human microphone test.
+
+Separate confirmed-text tests returned a short correction/example for "I would likes tea please" and gentle redirection without a correction for "I like football". The synthetic audio grammar-error sample was recognized in a corrected form, so preserving spoken grammatical errors is an unresolved transcription-quality risk. The transcription prompt was strengthened, but that change has not yet been verified against human recordings. Do not present transcription as reliably verbatim until measured.
+
+See `docs/live-api-check.json` and `docs/live-feedback-check.json` for non-personal test fixtures and measurements. These results record real generation calls. The API ledger remains local and includes development failures; exported reports are not billing invoices.
+
