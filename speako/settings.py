@@ -11,7 +11,12 @@ if env_file.exists():
             key, value = line.split('=', 1)
             os.environ.setdefault(key.strip(), value.strip().strip('\"').strip("'"))
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or secrets.token_urlsafe(48)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    secret_file = BASE_DIR / '.django-secret'
+    if not secret_file.exists():
+        secret_file.write_text(secrets.token_urlsafe(48), encoding='utf-8')
+    SECRET_KEY = secret_file.read_text(encoding='utf-8').strip()
 DEBUG = False
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'testserver']
 INSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.sessions', 'django.contrib.staticfiles', 'practice']
