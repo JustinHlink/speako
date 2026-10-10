@@ -90,6 +90,14 @@ function play(text,rate=1,onStart=null) {
 }
 function releaseMic(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}if(audioContext){audioContext.close().catch(()=>{});audioContext=null;}analyser=null;$('meter-fill').style.width='0';clearInterval(recordTimer);}
 function meter(){if(recorder?.state!=='recording'||!analyser)return;const data=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(data);let sum=0;for(const n of data)sum+=((n-128)/128)**2;const rms=Math.sqrt(sum/data.length);if(rms>.008)hadVoice=true;$('meter-fill').style.width=`${Math.min(100,rms*700)}%`;requestAnimationFrame(meter);}
+function microphoneError(e) {
+  const help = ' If you already allowed access, open http://127.0.0.1:8001/ in Chrome or Edge. In Windows Settings > Privacy & security > Microphone, allow microphone access and desktop apps.';
+  if(e.name==='NotAllowedError') return 'Microphone access was blocked by the browser or Windows. Site permission alone may not be enough.' + help;
+  if(e.name==='SecurityError') return 'This browser context blocks microphone recording.' + help;
+  if(e.name==='NotFoundError') return 'No microphone was found. Connect one and select it in Windows Settings > System > Sound > Input, then try again.';
+  if(e.name==='NotReadableError' || e.name==='AbortError') return 'The microphone could not be started. Check your Windows input device, close other apps using it, and try again.' + help;
+  return e.message || 'Recording could not start. Check your microphone and try again.';
+}
 async function record(){
   error();busy=true;controls();micRequested=performance.now();state('Preparing microphone…','processing');
   try {
@@ -101,7 +109,7 @@ async function record(){
     recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=processRecording;
     recorder.start();recordStarted=performance.now();busy=false;state('Listening — speak now','recording');controls();meter();
     recordTimer=setInterval(()=>{const secondsElapsed=(performance.now()-recordStarted)/1000;$('record-duration').textContent=`${secondsElapsed.toFixed(1)} / 30 s`;if(secondsElapsed>=30)stop();},100);
-  }catch(e){measure('microphone',performance.now()-micRequested,'failed');releaseMic();busy=false;state('Microphone unavailable');error(e.name==='NotAllowedError'?'Microphone access was denied. Allow it in your browser’s site settings, then try again.':e.message);controls();}
+  }catch(e){measure('microphone',performance.now()-micRequested,'failed');releaseMic();busy=false;state('Microphone unavailable');error(microphoneError(e));controls();}
 }
 function stop(){if(recorder?.state==='recording'){measure('recording',performance.now()-recordStarted);recorder.stop();$('stop').disabled=true;busy=true;controls();}}
 async function processRecording(){
@@ -123,6 +131,6 @@ $('confirm').onclick=async()=>{
 };
 $('repeat').onclick=()=>{error();play(lastReply,.75);};
 $('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/');session=result.session;render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
-$('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.1',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
+$('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.2',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
 window.addEventListener('beforeunload',()=>{releaseMic();if('speechSynthesis' in window)speechSynthesis.cancel();});
 (async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);ready=data.api_ready;session=data.session;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state('Your saved local summary is available');else if(session?.status==='in_progress')state('Ready for your answer');measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
