@@ -15,6 +15,20 @@ Project folder: `C:\Users\Justin\Desktop\SE\speako`.
 3. Double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`.
 4. Open `http://127.0.0.1:8001/` in current Chrome or Edge. Allow the microphone when you choose Record. Keep the terminal open. Stop with Ctrl+C. Restart after changing `.env`.
 
+## Run on macOS
+
+1. Create the isolated environment if not already present. Use Python 3.10 or newer (for example Homebrew `python3`); the system `/usr/bin/python3` may be too old for Django 5.2:
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -r requirements.txt
+   ```
+   With the python.org installer, run its "Install Certificates.command" once, otherwise Gemini requests fail with SSL certificate errors.
+2. Copy `.env.example` to `.env` (`cp .env.example .env`) and fill it in exactly as in Windows step 2.
+3. Run `./start.sh` from the project folder.
+4. Open `http://127.0.0.1:8001/` in current Chrome. Allow the microphone when you choose Record. In System Settings > Privacy & security > Microphone, enable access for your browser, then quit and reopen it if it was already running. Keep the terminal open. Stop with Ctrl+C. Restart after changing `.env`.
+
+Verify with `.venv/bin/python manage.py check` and `.venv/bin/python manage.py test`.
+
 Without a key the real application opens and explains setup; it never substitutes scripted AI responses. There is no login, deployment, reviewer dashboard or curator editor in this milestone. Browser-local sessions persist in SQLite; this is not account-based progress.
 
 ## Practice
