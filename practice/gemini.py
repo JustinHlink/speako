@@ -7,7 +7,7 @@ import urllib.request
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Sum
-from .models import ApiAttempt
+from .models import ApiUsage
 
 
 class ProviderError(Exception):
@@ -25,7 +25,7 @@ def ready():
 
 
 def usage():
-    rows = ApiAttempt.objects.all()
+    rows = ApiUsage.objects.all()
     totals = rows.aggregate(guard=Sum('guard_usd'), inputs=Sum('prompt_tokens'), outputs=Sum('output_tokens'))
     return {'attempts': rows.count(), 'guard_usd': round(totals['guard'] or 0, 4),
             'external_spend_usd': settings.RECORDED_EXTERNAL_SPEND_USD,
@@ -42,7 +42,7 @@ def generate(purpose, parts, system, schema):
         raise ProviderError(message)
     # Writing first obtains SQLite's writer lock, making reservation checks serial.
     with transaction.atomic():
-        attempt = ApiAttempt.objects.create(purpose=purpose)
+        attempt = ApiUsage.objects.create(purpose=purpose)
         ledger = usage()
         if (ledger['guard_usd'] + ledger['external_spend_usd'] > ledger['budget_usd']
                 or ledger['attempts'] > settings.MAX_API_ATTEMPTS):
