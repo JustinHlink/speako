@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import PracticeSession, ApiAttempt
+from .models import PracticeSession, ApiUsage
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -140,7 +140,7 @@ class BudgetTests(TestCase):
     def test_only_two_api_purposes_allowed(self):
         with self.assertRaises(ProviderError):
             generate('summary', [], '', {})
-        self.assertEqual(ApiAttempt.objects.count(), 0)
+        self.assertEqual(ApiUsage.objects.count(), 0)
 
     @override_settings(PROJECT_BUDGET_USD=0.01)
     @patch('urllib.request.urlopen')
@@ -148,13 +148,13 @@ class BudgetTests(TestCase):
         with self.assertRaises(ProviderError):
             generate('conversation', [], '', {})
         network.assert_not_called()
-        self.assertEqual(ApiAttempt.objects.count(), 0)
+        self.assertEqual(ApiUsage.objects.count(), 0)
 
     @patch('urllib.request.urlopen', side_effect=TimeoutError)
     def test_failed_request_remains_in_project_ledger(self, network):
         with self.assertRaises(ProviderError):
             generate('transcription', [], '', {})
-        attempt = ApiAttempt.objects.get()
+        attempt = ApiUsage.objects.get()
         self.assertEqual(attempt.status, 'network_error')
         self.assertEqual(attempt.guard_usd, 0.02)
 
