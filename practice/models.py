@@ -21,3 +21,24 @@ class ApiAttempt(models.Model):
     # A conservative reservation remains even when token usage is unavailable.
     guard_usd = models.FloatField(default=0.02)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class Flag(models.Model):
+    STATUS_CHOICES = [
+        ('unresolved', 'Unresolved'),
+        ('accepted', 'Accepted'),
+        ('incorrect', 'Incorrect'),
+    ]
+
+    text = models.TextField()
+    ai_reply = models.TextField()
+    reason = models.TextField(blank=True, default='') # Can be deleted if not needed
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='unresolved')
+    reviewer_id = models.CharField(max_length=20, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Flag {self.id} - {self.status}"
+
+
