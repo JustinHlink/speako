@@ -12,3 +12,4 @@ recordings/
 test-results/
 .DS_Store
 Thumbs.db
+.vscode/settings.json
