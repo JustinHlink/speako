@@ -26,7 +26,7 @@ def ready():
 
 def usage():
     rows = ApiUsage.objects.all()
-    totals = rows.aggregate(guard=Sum('guard_usd'), inputs=Sum('prompt_tokens'), outputs=Sum('output_tokens'))
+    totals = rows.aggregate(guard=Sum('estimated_usd'), inputs=Sum('input_tokens'), outputs=Sum('output_tokens'))
     return {'attempts': rows.count(), 'guard_usd': round(totals['guard'] or 0, 4),
             'external_spend_usd': settings.RECORDED_EXTERNAL_SPEND_USD,
             'budget_usd': min(settings.PROJECT_BUDGET_USD, 10),

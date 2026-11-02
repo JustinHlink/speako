@@ -39,7 +39,7 @@ async function request(url, data={}) {
     const form=data instanceof FormData;
     const response=await fetch(url,{method:'POST',headers:form?{'X-CSRFToken':csrf()}:{'X-CSRFToken':csrf(),'Content-Type':'application/json'},body:form?data:JSON.stringify(data),signal:controller.signal});
     const result=await response.json(); usage(result.usage);
-    if (!response.ok) { const e=new Error(result.error || 'This step failed. Retry.');e.serverMs=result.server_ms;throw e; }
+    if (!response.ok) { const e=new Error(result.error?.message || result.error || 'This step failed. Retry.');e.serverMs=result.server_ms;throw e; }
     return result;
   } catch (e) { if(e.name==='AbortError') throw new Error('The request timed out. Refresh to check whether it completed before retrying.');throw e; }
   finally {clearTimeout(timeout);}
@@ -88,14 +88,15 @@ function play(text,rate=1,onStart=null) {
     speechSynthesis.speak(utterance);
   });
 }
-function releaseMic(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}if(audioContext){audioContext.close().catch(()=>{});audioContext=null;}analyser=null;$('meter-fill').style.width='0';clearInterval(recordTimer);}
+function releaseMic(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}if(audioContext){audioContext.close().catch(()=>{});audioContext=null;}analyser=null;$('meter-fill').style.width='0';clearInterval(recordTimer);$('record-duration').textContent='Up to 30 seconds';}
 function meter(){if(recorder?.state!=='recording'||!analyser)return;const data=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(data);let sum=0;for(const n of data)sum+=((n-128)/128)**2;const rms=Math.sqrt(sum/data.length);if(rms>.008)hadVoice=true;$('meter-fill').style.width=`${Math.min(100,rms*700)}%`;requestAnimationFrame(meter);}
+const micDeniedMessage='Microphone access is blocked, so you cannot answer yet. Enable it in your browser’s site settings (next to the address bar) and in your system privacy settings (macOS: System Settings > Privacy & Security > Microphone; Windows: Settings > Privacy & security > Microphone), then try again.';
+async function micDenied(){try{return (await navigator.permissions.query({name:'microphone'})).state==='denied';}catch{return false;}}
 function microphoneError(e) {
-  const help = ' If you already allowed access, open http://127.0.0.1:8001/ in Chrome or Edge. In Windows Settings > Privacy & security > Microphone, allow microphone access and desktop apps.';
-  if(e.name==='NotAllowedError') return 'Microphone access was blocked by the browser or Windows. Site permission alone may not be enough.' + help;
-  if(e.name==='SecurityError') return 'This browser context blocks microphone recording.' + help;
-  if(e.name==='NotFoundError') return 'No microphone was found. Connect one and select it in Windows Settings > System > Sound > Input, then try again.';
-  if(e.name==='NotReadableError' || e.name==='AbortError') return 'The microphone could not be started. Check your Windows input device, close other apps using it, and try again.' + help;
+  if(e.name==='NotAllowedError') return micDeniedMessage;
+  if(e.name==='SecurityError') return 'This page cannot use the microphone. Open Speako over HTTPS or on localhost in a current browser, then try again.';
+  if(e.name==='NotFoundError') return 'No microphone was found. Connect one, select it as your system input device, and try again.';
+  if(e.name==='NotReadableError' || e.name==='AbortError') return 'The microphone could not be started. Check your input device, close other apps using it, and try again.';
   return e.message || 'Recording could not start. Check your microphone and try again.';
 }
 async function record(){
@@ -107,7 +108,7 @@ async function record(){
     recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);chunks=[];hadVoice=false;
     try{audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=256;audioContext.createMediaStreamSource(stream).connect(analyser);}catch{analyser=null;hadVoice=true;}
     recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=processRecording;
-    recorder.start();recordStarted=performance.now();busy=false;state('Listening — speak now','recording');controls();meter();
+    recorder.start();recordStarted=performance.now();busy=false;state('Listening — speak now','recording');$('record-duration').textContent='0.0 / 30 s';controls();meter();
     recordTimer=setInterval(()=>{const secondsElapsed=(performance.now()-recordStarted)/1000;$('record-duration').textContent=`${secondsElapsed.toFixed(1)} / 30 s`;if(secondsElapsed>=30)stop();},100);
   }catch(e){measure('microphone',performance.now()-micRequested,'failed');releaseMic();busy=false;state('Microphone unavailable');error(microphoneError(e));controls();}
 }
@@ -120,7 +121,7 @@ async function processRecording(){
   catch(e){measure('transcription',performance.now()-begun,'failed',e.serverMs);error(e.message);state('Recognition failed — record again');}
   finally{busy=false;controls();chunks=[];}
 }
-$('start').onclick=async()=>{if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/');session=result.session;recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
+$('start').onclick=async()=>{if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);return;}if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/');session=result.session;recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('record').onclick=record;$('stop').onclick=stop;
 $('discard').onclick=async()=>{error();busy=true;controls();try{const result=await request('/api/discard/');measure('confirmation',performance.now()-reviewStarted,'discarded');session=result.session;recognitionWait=0;render();state('Old transcript discarded. Record again.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('confirm').onclick=async()=>{
@@ -133,4 +134,4 @@ $('repeat').onclick=()=>{error();play(lastReply,.75);};
 $('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/');session=result.session;render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.2',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
 window.addEventListener('beforeunload',()=>{releaseMic();if('speechSynthesis' in window)speechSynthesis.cancel();});
-(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);ready=data.api_ready;session=data.session;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state('Your saved local summary is available');else if(session?.status==='in_progress')state('Ready for your answer');measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
+(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);ready=data.api_ready;session=data.session;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state('Your saved local summary is available');else if(session?.status==='in_progress'){if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);}else state('Ready for your answer');}measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
