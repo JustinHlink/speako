@@ -213,6 +213,24 @@ class AuthenticationTests(TestCase):
         response = self.client.post('/api/auth/logout/')
         self.assertEqual(response.status_code, 401)
 
+    def test_register_success(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'new_student', 'password': 'password123', 'role': 'Learner'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(username='new_student').exists())
+        self.assertEqual(User.objects.get(username='new_student').role, 'Learner')
+
+    def test_register_duplicate_username_returns_409(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'test_learner', 'password': 'password123'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 409)
+
 
 class SummaryTests(TestCase):
     def test_only_confirmed_learner_words_and_all_corrections(self):

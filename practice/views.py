@@ -117,6 +117,59 @@ def api_logout(request):
 
     return JsonResponse({}, status=204)
 
+require_POST
+def api_register(request):
+    """
+    A03: POST /api/auth/register/
+    Register a new user with the specified role (default is Learner).
+    """
+    data = body(request)
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    role = data.get('role', 'Learner').strip()
+
+    if not username or not password:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'Username and password are required.'
+            }
+        }, status=400)
+
+    allowed_roles = [choice[0] for choice in User.ROLE_CHOICES]
+    if role not in allowed_roles:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_ROLE',
+                'message': f'Role must be one of {allowed_roles}.'
+            }
+        }, status=400)
+
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({
+            'error': {
+                'code': 'CONFLICT',
+                'message': 'Username already exists.'
+            }
+        }, status=409)
+
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        role=role
+    )
+
+    login(request, user)
+
+    return JsonResponse({
+        'message': 'User created successfully.',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role
+        }
+    }, status=201)
+
 @require_GET
 @require_role(['Learner'])
 def list_lessons(request):
