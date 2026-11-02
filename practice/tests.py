@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import PracticeSession, ApiUsage
+from .models import *
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -164,6 +164,54 @@ class BudgetTests(TestCase):
         with self.assertRaises(ProviderError):
             generate('conversation', [], '', {})
         network.assert_not_called()
+
+class AuthenticationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.password = 'secure_password123'
+        self.learner = User.objects.create_user(
+            username='test_learner',
+            password=self.password,
+            role='Learner'
+        )
+
+    def test_login_success(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner', 'password': self.password}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('user', data)
+        self.assertEqual(data['user']['username'], 'test_learner')
+        self.assertEqual(data['user']['role'], 'Learner')
+
+    def test_login_invalid_credentials_returns_401(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner', 'password': 'wrong_password'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['error']['code'], 'UNAUTHORIZED')
+
+    def test_login_missing_fields_returns_400(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_logout_success(self):
+        self.client.force_login(self.learner)
+        response = self.client.post('/api/auth/logout/')
+        self.assertEqual(response.status_code, 204)
+
+    def test_logout_unauthenticated_returns_401(self):
+        response = self.client.post('/api/auth/logout/')
+        self.assertEqual(response.status_code, 401)
 
 
 class SummaryTests(TestCase):

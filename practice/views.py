@@ -68,24 +68,35 @@ def api_login(request):
     Inputs: username, password -> Account role & new authenticated session.
     """
     data = body(request)
-    username = data.get('username')
-    password = data.get('password')
-    
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+
     if not username or not password:
-        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username and password required.'}}, status=400)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'Both username and password are required.'
+            }
+        }, status=400)
+
     user = authenticate(request, username=username, password=password)
     if user is None:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid credentials.'}}, status=401)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'UNAUTHORIZED',
+                'message': 'Invalid username or password.'
+            }
+        }, status=401)
+
     login(request, user)
+
     return JsonResponse({
         'user': {
             'id': user.id,
             'username': user.username,
             'role': user.role
         }
-    })
+    }, status=200)
 
 
 @require_POST
@@ -95,9 +106,15 @@ def api_logout(request):
     Clear authenticated session and private browser state.
     """
     if not request.user.is_authenticated:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'No active session.'}}, status=401)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'UNAUTHORIZED',
+                'message': 'No active session found.'
+            }
+        }, status=401)
+
     logout(request)
+
     return JsonResponse({}, status=204)
 
 @require_GET
