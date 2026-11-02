@@ -29,10 +29,9 @@ def outside_words(text):
     return sorted(set(words(text)) - ALLOWED)
 
 
-def make_summary(turns):
-    used = set(w for turn in turns for w in words(turn['learner']))
+def make_summary(learner_texts, target_words):
+    used = set(w for text in learner_texts for w in words(text))
     return {
-        'used': [w for w in LESSON['target_words'] if w in used],
-        'unused': [w for w in LESSON['target_words'] if w not in used],
-        'corrections': [{'original': t['learner'], **t['correction']} for t in turns if t['correction']],
+        'used': [w for w in target_words if w in used],
+        'unused': [w for w in target_words if w not in used],
     }

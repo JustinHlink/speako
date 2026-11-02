@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/discard/', views.discard_transcript),
     path('api/reply/', views.submit_reply),
     path('api/exit/', views.exit_lesson),
+    path('api/attempts/<uuid:attempt_id>/summary/', views.get_summary),
     
     path('api/flag/submit/', views.submit_flag),
     path('api/flag/list/', views.list_flags),
