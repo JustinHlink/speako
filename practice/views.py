@@ -183,7 +183,7 @@ def start_lesson(request):
     if not isinstance(lesson_id, int):
         return error(400, 'INVALID_INPUT', 'lesson_id is required.')
     lesson = Lesson.objects.filter(pk=lesson_id).first()
-    if lesson is None or not vocabulary.lesson_is_configured(lesson):
+    if lesson is None or not vocabulary.lesson_is_configured(lesson) or vocabulary.outside_words(OPENING_LINE, lesson):
         return error(409, 'LESSON_UNAVAILABLE', 'This lesson is not ready yet. Choose another lesson.')
 
     with transaction.atomic():

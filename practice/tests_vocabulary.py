@@ -1,10 +1,11 @@
+import io
 import json
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from .gemini import ProviderError
-from .models import ApiUsage, Lesson, LessonWord, LessonAttempt, Turn, User
+from .models import ApiUsage, Lesson, LessonWord, LessonAttempt, Turn, User, SharedBeginnerWord
 from .vocabulary import allowed_words, lesson_is_configured, outside_words
 
 class VocabularyTests(TestCase):
@@ -109,6 +110,13 @@ class VocabularyEndpointTests(TestCase):
         self.assertEqual(attempt['turn_limit'], 5)
         self.assertEqual(outside_words(attempt['opening'], self.restaurant), [])
 
+    def test_lesson_does_not_start_when_opening_line_is_outside_word_list(self):
+        SharedBeginnerWord.objects.filter(word='welcome').delete()
+        response = self.start(self.restaurant)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()['error']['code'], 'LESSON_UNAVAILABLE')
+        self.assertFalse(LessonAttempt.objects.exists())
+    
     def test_starting_again_exits_the_old_attempt(self):
         self.start(self.restaurant)
         self.start(self.restaurant)
@@ -191,3 +199,29 @@ class VocabularyEndpointTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual(attempt.status, 'Completed')
         self.assertIsNotNone(attempt.ended_at)
+
+    def fake_gemini(self, network, reply):
+        body = {'usageMetadata': {'promptTokenCount': 900, 'candidatesTokenCount': 30},
+                'candidates': [{'content': {'parts': [{'text': json.dumps(reply)}]}}]}
+        network.return_value.__enter__.return_value = io.BytesIO(json.dumps(body).encode())
+
+    @override_settings(GEMINI_API_KEY='test-only', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite')
+    @patch('urllib.request.urlopen')
+    def test_reply_works_through_gemini_client_without_a_real_call(self, network):
+        self.fake_gemini(network, GOOD_REPLY)
+        attempt = self.started_attempt()
+        response = self.reply(attempt)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['attempt']['turns'][0]['reply'], GOOD_REPLY['reply'])
+        usage = ApiUsage.objects.get()
+        self.assertEqual((usage.call_type, usage.status), ('Reply', 'Success'))
+        self.assertEqual(self.client.get('/api/status/').status_code, 200)
+
+    @override_settings(GEMINI_API_KEY='test-only', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite')
+    @patch('urllib.request.urlopen')
+    def test_off_list_reply_through_gemini_client_is_rejected_and_logged(self, network):
+        self.fake_gemini(network, OFF_LIST_REPLY)
+        attempt = self.started_attempt()
+        self.assertEqual(self.reply(attempt).status_code, 422)
+        self.assertFalse(Turn.objects.exists())
+        self.assertEqual(ApiUsage.objects.get().status, 'Validation rejected')
