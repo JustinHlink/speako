@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import PracticeSession, ApiUsage
+from .models import *
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -164,6 +164,61 @@ class BudgetTests(TestCase):
         with self.assertRaises(ProviderError):
             generate('conversation', [], '', {})
         network.assert_not_called()
+
+class FlagSystemTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        
+        self.learner = User.objects.create_user(username='student', password='password', role='Learner')
+        self.reviewer = User.objects.create_user(username='reviewer_john', password='password', role='Reviewer')
+        
+        self.lesson = Lesson.objects.create(scenario='Restaurant', grammar_goal='Polite requests', turn_limit=5, status='Published')
+        self.attempt = LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson, status='In progress')
+        self.turn = Turn.objects.create(
+            attempt=self.attempt,
+            turn_number=1,
+            learner_text='I would like coffee',
+            ai_reply='Here is your tea',
+            pending_id='pid_test_123'
+        )
+
+    def test_submit_flag_success(self):
+        self.client.force_login(self.learner)
+        response = self.client.post(
+            '/api/flag/submit/',
+            json.dumps({'turn_id': self.turn.id}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Flag.objects.count(), 1)
+        self.assertEqual(Flag.objects.get().status, 'Unresolved')
+
+    def test_submit_flag_permission_denied_for_unauthenticated(self):
+        response = self.client.post(
+            '/api/flag/submit/',
+            json.dumps({'turn_id': self.turn.id}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_flags_forbidden_for_learner(self):
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/flag/list/')
+        self.assertEqual(response.status_code, 403)
+
+    def test_review_flag_success_by_reviewer(self):
+        flag = Flag.objects.create(turn=self.turn, status='Unresolved')
+        self.client.force_login(self.reviewer)
+        
+        response = self.client.post(
+            '/api/flag/review/',
+            json.dumps({'flag_id': flag.id, 'status': 'Acceptable'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        flag.refresh_from_db()
+        self.assertEqual(flag.status, 'Acceptable')
+        self.assertEqual(flag.reviewer, self.reviewer)
 
 
 class SummaryTests(TestCase):
