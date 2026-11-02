@@ -4,6 +4,7 @@ const labels = {page_ready:'Page ready', microphone:'Mic ready', transcription:'
 const targets = {page_ready:1500,microphone:1000,transcription:5000,ai_reply:5000,playback:1000,summary:500,system_total:11000};
 let session = null, ready = false, busy = false, speaking = false, recorder = null, stream = null, audioContext = null, analyser = null;
 let chunks = [], recordStarted = 0, recordTimer = null, micRequested = 0, reviewStarted = 0, recognitionWait = 0, lastReply = '', hadVoice = false;
+let lessonId = null;
 let measurements = [];
 try { measurements = JSON.parse(localStorage.getItem('speako-timing') || '[]'); if (!Array.isArray(measurements)) measurements = []; } catch { measurements = []; }
 const seconds = ms => `${(ms / 1000).toFixed(2)} s`;
@@ -39,7 +40,7 @@ async function request(url, data={}) {
     const form=data instanceof FormData;
     const response=await fetch(url,{method:'POST',headers:form?{'X-CSRFToken':csrf()}:{'X-CSRFToken':csrf(),'Content-Type':'application/json'},body:form?data:JSON.stringify(data),signal:controller.signal});
     const result=await response.json(); usage(result.usage);
-    if (!response.ok) { const e=new Error(result.error?.message || result.error || 'This step failed. Retry.');e.serverMs=result.server_ms;throw e; }
+    if (!response.ok) { const e=new Error(SpeakoProtocol.error(result.error));e.serverMs=result.server_ms;throw e; }
     return result;
   } catch (e) { if(e.name==='AbortError') throw new Error('The request timed out. Refresh to check whether it completed before retrying.');throw e; }
   finally {clearTimeout(timeout);}
@@ -55,13 +56,14 @@ function controls() {
   $('discard').disabled=!pending || busy || speaking;
   $('repeat').disabled=!lastReply || busy || speaking || recording;
   $('exit').disabled=!active || busy || speaking || recording;
-  $('progress').textContent=session ? session.status==='completed'?'Lesson complete':session.status==='exited'?'Exited early':`Exchange ${session.turns.length} / 5` : 'Ready to begin';
+  $('progress').textContent=session ? session.status==='completed'?'Lesson complete':session.status==='exited'?'Exited early':`Exchange ${session.turns.length} / ${session.turn_limit}` : 'Ready to begin';
 }
 function message(text,who) {const div=document.createElement('div');div.className='message '+who;const label=document.createElement('span');label.className='speaker';label.textContent=who==='learner'?'YOU':'WAITER';div.append(label,document.createTextNode(text));$('messages').append(div);}
 function correction(c) {const div=document.createElement('div');div.className='correction';const title=document.createElement('strong');title.textContent='A little language help';div.append(title,document.createTextNode(c.explanation),document.createElement('br'),document.createTextNode(`Try: ${c.example}`));$('messages').append(div);}
 function wordList(parent,words) {for(const word of words){const span=document.createElement('span');span.textContent=word;parent.append(span);}}
 function summary() {
   const panel=$('summary');panel.replaceChildren();panel.hidden=session?.status!=='completed';if(panel.hidden)return;
+  if(!session.summary){panel.textContent='Lesson complete. The saved-summary integration is not available in this build yet.';return;}
   const top=document.createElement('div');top.className='row';const heading=document.createElement('h2');heading.textContent='Nice work. Here is your recap.';const timer=document.createElement('div');timer.id='time-summary';timer.className='timing';timer.textContent='Summary · — / target ≤ 0.5 s';top.append(heading,timer);panel.append(top);
   for(const [label,list] of [['Target words you used',session.summary.used],['Words to try next time',session.summary.unused]]){const h=document.createElement('h3');h.textContent=label;panel.append(h);const div=document.createElement('div');div.className='word-list';if(list.length)wordList(div,list);else div.textContent='None';panel.append(div);}
   const h=document.createElement('h3');h.textContent='Corrections from this lesson';panel.append(h);
@@ -116,22 +118,24 @@ function stop(){if(recorder?.state==='recording'){measure('recording',performanc
 async function processRecording(){
   const mime=recorder.mimeType.split(';')[0];const blob=new Blob(chunks,{type:mime});releaseMic();busy=true;controls();
   if(!hadVoice || blob.size<100){busy=false;state('Ready for your answer');error('No voice activity was detected. Nothing was sent for evaluation. Please record again.');controls();return;}
-  state('Recognizing your words…','processing');const begun=performance.now();const form=new FormData();form.append('audio',blob,'answer');
-  try{const result=await request('/api/transcribe/',form);recognitionWait=performance.now()-begun;session=result.session;render();measure('transcription',recognitionWait,'success',result.server_ms);reviewStarted=performance.now();state('Check the recognized text before continuing');}
+  state('Recognizing your words…','processing');const begun=performance.now();const form=new FormData();form.append('audio',blob,'answer');form.append('attempt_id',session.id);
+  try{const result=await request('/api/transcribe/',form);recognitionWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);render();measure('transcription',recognitionWait,'success',result.server_ms);reviewStarted=performance.now();state('Check the recognized text before continuing');}
   catch(e){measure('transcription',performance.now()-begun,'failed',e.serverMs);error(e.message);state('Recognition failed — record again');}
   finally{busy=false;controls();chunks=[];}
 }
-$('start').onclick=async()=>{if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);return;}if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/');session=result.session;recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
+$('start').onclick=async()=>{if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);return;}if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/',{lesson_id:lessonId});session=SpeakoProtocol.attempt(result.attempt);recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('record').onclick=record;$('stop').onclick=stop;
-$('discard').onclick=async()=>{error();busy=true;controls();try{const result=await request('/api/discard/');measure('confirmation',performance.now()-reviewStarted,'discarded');session=result.session;recognitionWait=0;render();state('Old transcript discarded. Record again.');}catch(e){error(e.message);}finally{busy=false;controls();}};
+$('discard').onclick=async()=>{error();busy=true;controls();try{const result=await request('/api/discard/',SpeakoProtocol.confirmation(session));measure('confirmation',performance.now()-reviewStarted,'discarded');session=SpeakoProtocol.attempt(result.attempt);recognitionWait=0;render();state('Old transcript discarded. Record again.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('confirm').onclick=async()=>{
   error();measure('confirmation',performance.now()-reviewStarted);busy=true;controls();state('Your waiter is thinking…','processing');const begun=performance.now();
-  try{const result=await request('/api/reply/',{expected_turn:session.turns.length});const replyWait=performance.now()-begun;session=result.session;render();measure('ai_reply',replyWait,'success',result.server_ms);if(result.summary_ms!=null)measure('summary',result.summary_ms);
+  try{const result=await request('/api/reply/',SpeakoProtocol.confirmation(session));const replyWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);render();measure('ai_reply',replyWait,'success',result.server_ms);if(result.summary_ms!=null)measure('summary',result.summary_ms);
     busy=false;await play(lastReply,1,playbackMs=>measure('system_total',recognitionWait+replyWait+playbackMs));
   }catch(e){measure('ai_reply',performance.now()-begun,'failed',e.serverMs);error(e.message);state('AI response failed — retry Continue');}finally{busy=false;controls();}
 };
 $('repeat').onclick=()=>{error();play(lastReply,.75);};
-$('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/');session=result.session;render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
+$('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/',{attempt_id:session.id});session=SpeakoProtocol.attempt(result.attempt);render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.2',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
+$('sign-in-form').onsubmit=async event=>{event.preventDefault();error();try{await request('/api/auth/login/',{username:$('username').value,password:$('password').value});$('password').value='';location.reload();}catch(e){error(e.message);}};
+$('sign-out').onclick=async()=>{try{const response=await fetch('/api/auth/logout/',{method:'POST',headers:{'X-CSRFToken':csrf()}});if(!response.ok)throw new Error('Sign out failed.');session=null;localStorage.removeItem('speako-timing');location.reload();}catch(e){error(e.message);}};
 window.addEventListener('beforeunload',()=>{releaseMic();if('speechSynthesis' in window)speechSynthesis.cancel();});
-(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);ready=data.api_ready;session=data.session;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state('Your saved local summary is available');else if(session?.status==='in_progress'){if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);}else state('Ready for your answer');}measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
+(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);lessonId=data.lesson.id;$('account-name').textContent=data.user ? 'Signed in as '+data.user.username : 'Sign in to practice';$('sign-out').hidden=!data.user;$('sign-in-form').hidden=!!data.user;ready=data.api_ready;session=SpeakoProtocol.attempt(data.attempt);usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state(session.summary?'Your saved summary is available':'Lesson complete; summary integration pending');else if(session?.status==='in_progress'){if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);}else state('Ready for your answer');}measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
