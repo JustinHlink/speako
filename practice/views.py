@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import User, Lesson, LessonWord, SharedBeginnerWord, LessonAttempt, Turn, Correction, LessonSummary, Flag, ApiUsage
-from . import gemini, vocabulary
+from . import gemini, vocabulary, providers, transcripts
 from .lesson import LESSON, ALLOWED, TARGETS, outside_words, make_summary
 
 
@@ -38,7 +38,19 @@ def attempt_snapshot(attempt):
         'turn_limit': attempt.lesson.turn_limit,
         'turns': [turn_snapshot(turn) for turn in turns],
         'pending': {'id': attempt.pending_id, 'text': attempt.pending_transcript} if attempt.pending_id else None,
+        'summary': saved_summary(attempt),
     }
+
+
+def saved_summary(attempt):
+    try:
+        summary = attempt.summary
+    except LessonSummary.DoesNotExist:
+        return None
+    corrections = Correction.objects.filter(turn__attempt=attempt).select_related('turn').order_by('turn__turn_number')
+    return {'used': summary.words_used, 'unused': summary.words_not_used,
+            'corrections': [{'original': c.turn.learner_text, 'explanation': c.explanation,
+                             'example': c.corrected_example} for c in corrections]}
 
 
 def turn_snapshot(turn):
@@ -275,14 +287,16 @@ def status(request):
     GET /api/status/
     Return global ready state, current attempt snapshot, and usage guard stats.
     """
-    ok, message = gemini.ready()
+    ok, message = providers.ready()
+    attempt = None
+    if request.user.is_authenticated:
+        attempt = LessonAttempt.objects.filter(learner=request.user).select_related('lesson').order_by('-started_at').first()
+    lesson = Lesson.objects.filter(scenario=LESSON['title'], status='Published').first()
     return JsonResponse({
-        'lesson': LESSON,
-        'targets': TARGETS,
-        'api_ready': ok,
-        'setup_message': message,
-        'usage': gemini.usage(),
-        'session': None
+        'lesson': {**LESSON, 'id': lesson.pk if lesson else None},
+        'targets': TARGETS, 'api_ready': ok, 'setup_message': message,
+        'user': {'username': request.user.username, 'role': request.user.role} if request.user.is_authenticated else None,
+        'usage': providers.usage(), 'attempt': attempt_snapshot(attempt) if attempt else None,
     })
 
 OPENING_LINE = 'Hello! Welcome. What would you like today?'
@@ -322,7 +336,10 @@ def transcribe_audio(request):
     POST /api/transcribe/
     Upload audio file, reserve budget, call Gemini Transcribe, and store pending_transcript.
     """
-    return JsonResponse({'session': {}})
+    attempt = find_attempt(request, request.POST.get('attempt_id'))
+    if attempt is None:
+        return error(404, 'NOT_FOUND', 'Lesson attempt not found.')
+    return transcripts.process(request, attempt, attempt_snapshot)
 
 
 @require_POST
@@ -332,7 +349,11 @@ def discard_transcript(request):
     POST /api/discard/
     Discard pending transcript (Try again). Never advances turn or calls AI.
     """
-    return JsonResponse({'session': {}})
+    data = body(request)
+    attempt = find_attempt(request, data.get('attempt_id'))
+    if attempt is None:
+        return error(404, 'NOT_FOUND', 'Lesson attempt not found.')
+    return transcripts.locked(request, attempt, attempt_snapshot, pending_id=data.get('pending_id'))
 
 
 REPLY_SCHEMA = {'type': 'OBJECT', 'properties': {
@@ -412,7 +433,7 @@ def reply_to_pending(attempt, pending_id):
         'learner': attempt.pending_transcript,
     }
     try:
-        result = gemini.generate('conversation', [{'text': json.dumps(context)}],
+        result = providers.reply([{'text': json.dumps(context)}],
                                  reply_instructions(lesson, turn_number), REPLY_SCHEMA)
     except gemini.ProviderError as exc:
         return error(502, 'PROVIDER_ERROR', str(exc))
@@ -447,7 +468,15 @@ def exit_lesson(request):
     POST /api/exit/
     Exit an unfinished lesson. Sets status='Exited' with no summary created.
     """
-    return JsonResponse({'session': {}})
+    attempt = find_attempt(request, body(request).get('attempt_id'))
+    if attempt is None:
+        return error(404, 'NOT_FOUND', 'Lesson attempt not found.')
+    changed = LessonAttempt.objects.filter(pk=attempt.pk, status='In progress', busy=False).update(
+        status='Exited', pending_id='', pending_transcript='', ended_at=timezone.now())
+    if not changed:
+        return error(409, 'BUSY_OR_CLOSED', 'Wait for processing to finish, or start a new attempt.')
+    attempt.refresh_from_db()
+    return JsonResponse({'attempt': attempt_snapshot(attempt)})
 
 
 @require_POST
@@ -487,4 +516,4 @@ def metrics(request):
     Export ApiUsage ledger and timing measurements for instructor review.
     """
     rows = list(ApiUsage.objects.values('call_type', 'status', 'reserved_usd', 'estimated_usd', 'input_tokens', 'output_tokens', 'started_at'))
-    return JsonResponse({'attempts': rows, 'usage': gemini.usage()}, json_dumps_params={'indent': 2})
+    return JsonResponse({'attempts': rows, 'usage': providers.usage()}, json_dumps_params={'indent': 2})
