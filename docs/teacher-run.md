@@ -1,6 +1,6 @@
 # Speako: instructor demo setup
 
-Submission version: **submission-sprint3-2026-11-04-r2**
+Submission version: **submission-sprint3-2026-11-04-r3**
 
 Speako runs on your own computer. The GitHub page contains source code, not a hosted application. This tag preserves the tested restaurant implementation and expanded setup instructions; the previous tag remains unchanged.
 
@@ -13,12 +13,12 @@ Speako runs on your own computer. The GitHub page contains source code, not a ho
 
 ## 2. Download this version
 
-**Without Git:** open the [submission release](https://github.com/JustinHlink/speako/releases/tag/submission-sprint3-2026-11-04-r2), download **Source code (zip)**, and extract it. Open the folder containing `manage.py`, `requirements.txt` and `.env.example`.
+**Without Git:** open the [submission release](https://github.com/JustinHlink/speako/releases/tag/submission-sprint3-2026-11-04-r3), download **Source code (zip)**, and extract it. Open the folder containing `manage.py`, `requirements.txt` and `.env.example`.
 
 **With Git:**
 
 ```text
-git clone --branch submission-sprint3-2026-11-04-r2 https://github.com/JustinHlink/speako.git speako-demo
+git clone --branch submission-sprint3-2026-11-04-r3 https://github.com/JustinHlink/speako.git speako-demo
 cd speako-demo
 ```
 
@@ -67,10 +67,8 @@ Back in PowerShell, run:
 |---|---|---|---|
 | `learner1` | `SpeakoDemo2026!` | Learner | Main restaurant walkthrough |
 | `learner2` | `SpeakoDemo2026!` | Learner | Separate account progress |
-| `reviewer1` | `SpeakoDemo2026!` | Reviewer | Reviewer API checks; no complete reviewer web page |
-| `curator1` | `SpeakoDemo2026!` | Curator | Curriculum role; no complete curator web page |
 
-These are local demonstration credentials, not GitHub or API credentials. They exist on your computer only after running the seed command. If you use a different password in that command, use it for all four accounts instead. Rerunning the command resets their passwords and roles without creating duplicates.
+These are local demonstration credentials, not GitHub or API credentials. They exist on your computer only after running the seed command. If you use a different password in that command, use it for the learner accounts instead. Rerunning the command resets the local demo passwords without creating duplicates.
 
 ## 5. Start the app — Windows
 

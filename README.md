@@ -77,10 +77,8 @@ macOS or Linux:
 |---|---|---|
 | `learner1` | `SpeakoDemo2026!` | Learner |
 | `learner2` | `SpeakoDemo2026!` | Learner |
-| `curator1` | `SpeakoDemo2026!` | Curator |
-| `reviewer1` | `SpeakoDemo2026!` | Reviewer |
 
-The commands above set all four local demo passwords to `SpeakoDemo2026!`. If you choose a different password in the seed command, use it instead (8 or more characters). These are local demo credentials, not GitHub or API credentials. You can also set `SPEAKO_DEMO_PASSWORD` instead of `--password`. Running the command again resets the passwords and roles and never makes duplicate accounts.
+The commands above set the documented learner passwords to `SpeakoDemo2026!`. If you choose a different password in the seed command, use it instead (8 or more characters). These are local demo credentials, not GitHub or API credentials. You can also set `SPEAKO_DEMO_PASSWORD` instead of `--password`. Running the command again resets the passwords and roles and never makes duplicate accounts.
 
 ## 4. Run
 
@@ -136,7 +134,7 @@ Gemini is used only for speech-to-text and for the partner's replies. The projec
 
 ## Submission and demo version
 
-For assessment, use the fixed tag `submission-sprint3-2026-11-04-r2` after it is
+For assessment, use the fixed tag `submission-sprint3-2026-11-04-r3` after it is
 published, or the exact commit linked in the submission document. New work goes
 through feature PRs and develop; tested submission changes are merged into main.
 Do not move an existing submission tag. A new checkout needs dependencies,
