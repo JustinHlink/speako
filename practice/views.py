@@ -69,7 +69,7 @@ def api_login(request):
     """
     data = body(request)
     username = data.get('username', '').strip()
-    password = data.get('password', '').strip()
+    password = data.get('password')
 
     if not isinstance(username, str) or not username.strip():
         return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username must be a non-empty string.'}}, status=400)
@@ -120,7 +120,7 @@ def api_register(request):
     """
     data = body(request)
     username = data.get('username', '').strip()
-    password = data.get('password', '').strip()
+    password = data.get('password')
     role = data.get('role', 'Learner').strip()
 
     if not username or not password:

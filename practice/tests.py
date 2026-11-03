@@ -243,6 +243,52 @@ class AuthenticationTests(TestCase):
         self.assertEqual(user.role, 'Learner')
         self.assertNotEqual(user.role, 'Curator')
 
+    def test_login_and_register_with_whitespace_password(self):
+        spaced_password = "  secret password 123  "
+        
+        reg_response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': spaced_password
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(reg_response.status_code, 201)
+
+        self.client.post('/api/auth/logout/')
+
+        wrong_login_response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': 'secret password 123'
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(wrong_login_response.status_code, 401)
+
+        correct_login_response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': spaced_password
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(correct_login_response.status_code, 200)
+
+    def test_login_non_string_password_returns_400(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'test_learner',
+                'password': 12345
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+
 
 class SummaryTests(TestCase):
     def test_only_confirmed_learner_words_and_all_corrections(self):
