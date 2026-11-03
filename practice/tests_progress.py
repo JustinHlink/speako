@@ -55,6 +55,14 @@ class MapStatusRuleTests(TestCase):
         latest = make_attempt(self.learner, self.restaurant, 'Completed')
         self.assertEqual(latest_completed_attempt(self.learner, self.restaurant), latest)
 
+    def test_completed_attempt_without_ended_at_is_skipped(self):
+        missing = make_attempt(self.learner, self.restaurant, 'Completed')
+        missing.ended_at = None
+        missing.save()
+        self.assertIsNone(latest_completed_attempt(self.learner, self.restaurant))
+        finished = make_attempt(self.learner, self.restaurant, 'Completed')
+        self.assertEqual(latest_completed_attempt(self.learner, self.restaurant), finished)
+
 
 class AccountProgressTests(TestCase):
     """US-16 AC1 to AC3 through the sign-in, start and reply endpoints."""

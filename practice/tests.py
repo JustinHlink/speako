@@ -1,14 +1,11 @@
 """Budget regression tests for the current ApiUsage schema."""
-
-from datetime import timezone
 import io
 import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord
-
-from .models import Turn, Flag, ApiUsage, User, Lesson, LessonAttempt
+from django.utils import timezone
+from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord, Turn, Flag
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -56,6 +53,81 @@ class BudgetTests(TestCase):
             generate('conversation', [], '', {})
         network.assert_not_called()
 
+class FlagSystemTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        
+        self.learner = User.objects.create_user(username='student', password='password', role='Learner')
+        self.reviewer = User.objects.create_user(username='reviewer_john', password='password', role='Reviewer')
+        
+        self.lesson = Lesson.objects.create(scenario='Restaurant', grammar_goal='Polite requests', turn_limit=5, status='Published')
+        self.attempt = LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson, status='In progress')
+        self.turn = Turn.objects.create(
+            attempt=self.attempt,
+            turn_number=1,
+            learner_text='I would like coffee',
+            ai_reply='Here is your tea',
+            pending_id='pid_test_123'
+        )
+
+    def test_submit_flag_success(self):
+        self.client.force_login(self.learner)
+        response = self.client.post(
+            '/api/flag/submit/',
+            json.dumps({'turn_id': self.turn.id}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Flag.objects.count(), 1)
+        self.assertEqual(Flag.objects.get().status, 'Unresolved')
+
+    def test_submit_flag_permission_denied_for_unauthenticated(self):
+        response = self.client.post(
+            '/api/flag/submit/',
+            json.dumps({'turn_id': self.turn.id}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_flags_forbidden_for_learner(self):
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/flag/list/')
+        self.assertEqual(response.status_code, 403)
+
+    def test_review_flag_success_by_reviewer(self):
+        flag = Flag.objects.create(turn=self.turn, status='Unresolved')
+        self.client.force_login(self.reviewer)
+        
+        response = self.client.post(
+            '/api/flag/review/',
+            json.dumps({'flag_id': flag.id, 'status': 'Acceptable'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        flag.refresh_from_db()
+        self.assertEqual(flag.status, 'Acceptable')
+        self.assertEqual(flag.reviewer, self.reviewer)
+
+    def test_review_flag_already_reviewed_returns_409(self):
+        reviewer2 = User.objects.create_user(username='reviewer_2', password='password', role='Reviewer')
+        
+        flag = Flag.objects.create(
+            turn=self.turn,
+            status='Acceptable',
+            reviewer=self.reviewer
+        )
+
+        self.client.force_login(reviewer2)
+        response = self.client.post(
+            '/api/flag/review/',
+            json.dumps({'flag_id': flag.id, 'status': 'Incorrect'}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 409)
+        flag.refresh_from_db()
+        self.assertEqual(flag.status, 'Acceptable')
+        self.assertEqual(flag.reviewer, self.reviewer)
 class LearningMapTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -67,7 +139,8 @@ class LearningMapTests(TestCase):
         
         self.lesson2 = Lesson.objects.create(scenario='Customs', grammar_goal='Short answers', turn_limit=5, status='Published')
         
-        LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson1, status='Completed')
+        LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson1, status='Completed',
+                                     ended_at=timezone.now())
 
     def test_list_lessons_status_computation(self):
         self.client.force_login(self.learner)
@@ -129,6 +202,7 @@ class LearningMapTests(TestCase):
     def test_list_lessons_unauthenticated_returns_401(self):
         response = self.client.get('/api/lessons/')
         self.assertEqual(response.status_code, 401)
+        
 class AuthenticationTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -252,82 +326,6 @@ class AuthenticationTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
-
-class FlagSystemTests(TestCase):
-    def setUp(self):
-        self.client = Client()
-        
-        self.learner = User.objects.create_user(username='student', password='password', role='Learner')
-        self.reviewer = User.objects.create_user(username='reviewer_john', password='password', role='Reviewer')
-        
-        self.lesson = Lesson.objects.create(scenario='Restaurant', grammar_goal='Polite requests', turn_limit=5, status='Published')
-        self.attempt = LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson, status='In progress')
-        self.turn = Turn.objects.create(
-            attempt=self.attempt,
-            turn_number=1,
-            learner_text='I would like coffee',
-            ai_reply='Here is your tea',
-            pending_id='pid_test_123'
-        )
-
-    def test_submit_flag_success(self):
-        self.client.force_login(self.learner)
-        response = self.client.post(
-            '/api/flag/submit/',
-            json.dumps({'turn_id': self.turn.id}),
-            content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(Flag.objects.count(), 1)
-        self.assertEqual(Flag.objects.get().status, 'Unresolved')
-
-    def test_submit_flag_permission_denied_for_unauthenticated(self):
-        response = self.client.post(
-            '/api/flag/submit/',
-            json.dumps({'turn_id': self.turn.id}),
-            content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 401)
-
-    def test_list_flags_forbidden_for_learner(self):
-        self.client.force_login(self.learner)
-        response = self.client.get('/api/flag/list/')
-        self.assertEqual(response.status_code, 403)
-
-    def test_review_flag_success_by_reviewer(self):
-        flag = Flag.objects.create(turn=self.turn, status='Unresolved')
-        self.client.force_login(self.reviewer)
-        
-        response = self.client.post(
-            '/api/flag/review/',
-            json.dumps({'flag_id': flag.id, 'status': 'Acceptable'}),
-            content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 200)
-        flag.refresh_from_db()
-        self.assertEqual(flag.status, 'Acceptable')
-        self.assertEqual(flag.reviewer, self.reviewer)
-
-    def test_review_flag_already_reviewed_returns_409(self):
-        reviewer2 = User.objects.create_user(username='reviewer_2', password='password', role='Reviewer')
-        
-        flag = Flag.objects.create(
-            turn=self.turn,
-            status='Acceptable',
-            reviewer=self.reviewer
-        )
-
-        self.client.force_login(reviewer2)
-        response = self.client.post(
-            '/api/flag/review/',
-            json.dumps({'flag_id': flag.id, 'status': 'Incorrect'}),
-            content_type='application/json'
-        )
-
-        self.assertEqual(response.status_code, 409)
-        flag.refresh_from_db()
-        self.assertEqual(flag.status, 'Acceptable')
-        self.assertEqual(flag.reviewer, self.reviewer)
 
 
 class SummaryTests(TestCase):
