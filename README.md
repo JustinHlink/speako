@@ -31,6 +31,14 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
+### Optional: Conda
+
+Instead of venv, run `conda env create -f environment.yml` and
+`conda activate speako`. Use `python manage.py ...` in the activated environment
+in place of the .venv Python paths below. Windows users can use
+`start_conda.bat` or `start_conda.ps1`. The recommended assessment path is venv;
+Conda scripts have been reviewed but not executed on this computer.
+
 ## 2. Configure
 
 Copy `.env.example` to `.env` (Windows: `copy .env.example .env`, macOS or Linux: `cp .env.example .env`). Then set these two values in `.env`:
