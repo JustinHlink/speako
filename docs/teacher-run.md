@@ -1,17 +1,16 @@
 # Fixed restaurant demo — November 4, 2026
 
-Version tag: **demo-sprint3-2026-11-04**
+Version tag: **submission-sprint3-2026-11-04**
 
-This tag identifies a fixed integration candidate. Use the tag rather than a
-moving branch for assessment. It includes features from the team's pull
-requests; the integration PR is #13 and is still awaiting teammate review.
-Do not treat an unmerged story as Done solely because it is in this candidate.
+Use this fixed tag for assessment rather than a moving development branch.
+The submission history preserves the original feature PRs and the integration
+review. Later changes require a new tag.
 
 ## Download
 
 Clone the tagged version (Git must be installed):
 
-    git clone --branch demo-sprint3-2026-11-04 https://github.com/JustinHlink/speako.git speako-demo
+    git clone --branch submission-sprint3-2026-11-04 https://github.com/JustinHlink/speako.git speako-demo
     cd speako-demo
 
 Alternatively download the source ZIP from the GitHub release, extract it, and
@@ -72,8 +71,8 @@ for an independently runnable system.
 
 ## Verification and boundaries
 
-- 106 Django tests passed on the integration candidate.
-- Microphone (11 checks), protocol, repeat-page and speech-helper tests passed.
+- 115 Django tests passed on the submission candidate.
+- All six frontend check files passed, including map-failure isolation and retained-recording retry.
 - A fresh clone installed dependencies in a new virtual environment; migration,
   demo-user creation, login and lesson-list checks succeeded.
 - Live water-order generation passed after the basic-vocabulary revision.
@@ -97,3 +96,17 @@ Continue development on feature branches or develop. To change this demo, issue
 a new tag and release after tests; do not move or replace the existing tag.
 Keep the team's individual PR reviews and main-branch merges as collaboration
 evidence. The fixed tag does not replace those records.
+
+## API failure recovery
+
+A transient speech-recognition failure gets at most one automatic retry, with
+budget reserved for each attempt. If both attempts fail, use Retry this recording
+without speaking again, or Record answer to replace the audio. The retained audio
+exists only in this browser tab's memory and is cleared after successful
+recognition. Quota and key errors need configuration/allowance checks rather than
+repeated retries. Provider errors do not advance the turn.
+
+Only one designated environment uses the project key for live tests at a time.
+Before handing live use to another computer, stop calls from the previous
+machine and retain its usage ledger and recorded external usage. A fresh
+installation must not silently reset the project-wide budget.

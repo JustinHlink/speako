@@ -529,7 +529,7 @@ def submit_flag(request):
     """
     data = body(request)
     turn_id = data.get('turn_id')
-    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool):
+    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool) or not 0 < turn_id <= 9223372036854775807:
         return JsonResponse({
             'error': {
                 'code': 'INVALID_INPUT',
@@ -541,13 +541,9 @@ def submit_flag(request):
     except Turn.DoesNotExist:
         return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Turn not found or access denied.'}}, status=404)
 
-    if hasattr(turn, 'flag'):
+    flag, created = Flag.objects.get_or_create(turn=turn, defaults={'status': 'Unresolved'})
+    if not created:
         return JsonResponse({'error': {'code': 'CONFLICT', 'message': 'This turn has already been flagged.'}}, status=409)
-
-    flag = Flag.objects.create(
-        turn=turn,
-        status='Unresolved'
-    )
 
     return JsonResponse({
         'message': 'Flag submitted successfully.',
@@ -595,7 +591,7 @@ def review_flag(request):
     if new_status not in ['Acceptable', 'Incorrect']:
         return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Status must be Acceptable or Incorrect.'}}, status=400)
 
-    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool):
+    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool) or not 0 < flag_id <= 9223372036854775807:
         return JsonResponse({
             'error': {
                 'code': 'INVALID_INPUT',
@@ -603,27 +599,14 @@ def review_flag(request):
             }
         }, status=400)
     
-    try: # check status of the flag before attempting to retrieve it
-        flag = Flag.objects.get(pk=flag_id, status='Unresolved')
-    except Flag.DoesNotExist:
+    reviewed_at = timezone.now()
+    changed = Flag.objects.filter(pk=flag_id, status='Unresolved').update(
+        status=new_status, reviewer=request.user, reviewed_at=reviewed_at)
+    if not changed:
         if Flag.objects.filter(pk=flag_id).exists():
-            return JsonResponse({
-                'error': {
-                    'code': 'CONFLICT',
-                    'message': 'This flag has already been reviewed and cannot be overwritten.'
-                }
-            }, status=409)
-        return JsonResponse({
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unresolved flag record not found.'
-            }
-        }, status=404)
-
-    flag.status = new_status
-    flag.reviewer = request.user
-    flag.reviewed_at = timezone.now()
-    flag.save()
+            return error(409, 'CONFLICT', 'This flag has already been reviewed and cannot be overwritten.')
+        return error(404, 'NOT_FOUND', 'Unresolved flag record not found.')
+    flag = Flag.objects.get(pk=flag_id)
 
     return JsonResponse({
         'message': 'Flag reviewed successfully.',

@@ -5,6 +5,7 @@ const targets = {page_ready:1500,microphone:1000,transcription:5000,ai_reply:500
 let session = null, ready = false, busy = false, speaking = false, recorder = null, stream = null, audioContext = null, analyser = null;
 let chunks = [], recordStarted = 0, recordTimer = null, micRequested = 0, reviewStarted = 0, recognitionWait = 0, lastReply = '', hadVoice = false;
 let lessonId = null, progress = null, reopenedSummary = null;
+let retainedRecording = null;
 let measurements = [];
 try { measurements = JSON.parse(localStorage.getItem('speako-timing') || '[]'); if (!Array.isArray(measurements)) measurements = []; } catch { measurements = []; }
 const seconds = ms => `${(ms / 1000).toFixed(2)} s`;
@@ -52,6 +53,9 @@ function controls() {
   $('start').textContent=active?'Restart practice':session?'Start new practice →':'Start practice →';
   $('record').disabled=!active || !ready || pending || busy || speaking || recording;
   $('stop').disabled=!recording;
+  const canRetry=active && !pending && retainedRecording?.attemptId===session?.id;
+  $('retry-recognition').hidden=!canRetry;
+  $('retry-recognition').disabled=!canRetry || busy || speaking || recording;
   $('confirm').disabled=!pending || busy || speaking;
   $('discard').disabled=!pending || busy || speaking;
   $('repeat').disabled=!SpeakoSpeech.canRepeat(lastReply, busy, speaking, recording);
@@ -131,7 +135,7 @@ async function record(){
     recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);chunks=[];hadVoice=false;
     try{audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=256;audioContext.createMediaStreamSource(stream).connect(analyser);}catch{analyser=null;hadVoice=true;}
     recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=processRecording;
-    recorder.start();recordStarted=performance.now();busy=false;state('Listening — speak now','recording');$('record-duration').textContent='0.0 / 30 s';controls();meter();
+    retainedRecording=null;recorder.start();recordStarted=performance.now();busy=false;state('Listening — speak now','recording');$('record-duration').textContent='0.0 / 30 s';controls();meter();
     recordTimer=setInterval(()=>{const secondsElapsed=(performance.now()-recordStarted)/1000;$('record-duration').textContent=`${secondsElapsed.toFixed(1)} / 30 s`;if(secondsElapsed>=30)stop();},100);
   }catch(e){measure('microphone',performance.now()-micRequested,'failed');releaseMic();busy=false;state('Microphone unavailable');error(microphoneError(e));controls();}
 }
@@ -139,12 +143,21 @@ function stop(){if(recorder?.state==='recording'){measure('recording',performanc
 async function processRecording(){
   const mime=recorder.mimeType.split(';')[0];const blob=new Blob(chunks,{type:mime});releaseMic();busy=true;controls();
   if(!hadVoice || blob.size<100){busy=false;state('Ready for your answer');error('No voice activity was detected. Nothing was sent for evaluation. Please record again.');controls();return;}
-  state('Recognizing your words…','processing');const begun=performance.now();const form=new FormData();form.append('audio',blob,'answer');form.append('attempt_id',session.id);
-  try{const result=await request('/api/transcribe/',form);recognitionWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);render();measure('transcription',recognitionWait,'success',result.server_ms);reviewStarted=performance.now();state('Check the recognized text before continuing');}
-  catch(e){measure('transcription',performance.now()-begun,'failed',e.serverMs);error(e.message);state('Recognition failed — record again');}
-  finally{busy=false;controls();chunks=[];}
+  retainedRecording={blob, attemptId:session.id};
+  await recognizeRetainedRecording();
+  chunks=[];
 }
-$('start').onclick=async()=>{if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);return;}if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/',{lesson_id:lessonId});session=SpeakoProtocol.attempt(result.attempt);reopenedSummary=null;recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
+async function recognizeRetainedRecording(){
+  if(!retainedRecording || retainedRecording.attemptId!==session?.id || session?.pending || session?.status!=='in_progress')return;
+  error();busy=true;controls();state('Recognizing your words…','processing');
+  const begun=performance.now();const form=new FormData();
+  form.append('audio',retainedRecording.blob,'answer');form.append('attempt_id',retainedRecording.attemptId);
+  try{const result=await request('/api/transcribe/',form);recognitionWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);retainedRecording=null;render();measure('transcription',recognitionWait,'success',result.server_ms);reviewStarted=performance.now();state('Check the recognized text before continuing');}
+  catch(e){measure('transcription',performance.now()-begun,'failed',e.serverMs);error(e.message);state('Recognition failed — retry this recording or record again');}
+  finally{busy=false;controls();}
+}
+$('retry-recognition').onclick=recognizeRetainedRecording;
+$('start').onclick=async()=>{if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);return;}if(session?.status==='in_progress'&&!window.confirm('Restart this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/start/',{lesson_id:lessonId});session=SpeakoProtocol.attempt(result.attempt);retainedRecording=null;reopenedSummary=null;recognitionWait=0;render();busy=false;await play(lastReply);}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('record').onclick=record;$('stop').onclick=stop;
 $('view-summary').onclick=async()=>{error();try{const response=await fetch(`/api/attempts/${progress.last_completed_attempt_id}/summary/`);const result=await response.json();if(!response.ok)throw new Error(SpeakoProtocol.error(result.error));reopenedSummary=result.summary;render();$('summary').scrollIntoView({block:'nearest'});}catch(e){error(e.message);}};
 $('discard').onclick=async()=>{error();busy=true;controls();try{const result=await request('/api/discard/',SpeakoProtocol.confirmation(session));measure('confirmation',performance.now()-reviewStarted,'discarded');session=SpeakoProtocol.attempt(result.attempt);recognitionWait=0;render();state('Old transcript discarded. Record again.');}catch(e){error(e.message);}finally{busy=false;controls();}};

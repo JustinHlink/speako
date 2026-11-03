@@ -1,5 +1,6 @@
 """Only transcription and lesson conversation may call Gemini."""
 import json
+import logging
 import re
 import time
 import urllib.error
@@ -12,8 +13,14 @@ from django.utils import timezone
 from .models import ApiUsage
 
 
+logger = logging.getLogger(__name__)
+
+
 class ProviderError(Exception):
-    pass
+    def __init__(self, message, *, retryable=False, http_status=None):
+        super().__init__(message)
+        self.retryable = retryable
+        self.http_status = http_status
 
 
 def ready():
@@ -37,6 +44,18 @@ def usage():
 
 
 def generate(purpose, parts, system, schema):
+    # Speech retry is bounded; each network attempt reserves its own allowance.
+    tries = 2 if purpose == 'transcription' else 1
+    for number in range(tries):
+        try:
+            return _generate_once(purpose, parts, system, schema)
+        except ProviderError as exc:
+            if not exc.retryable or number + 1 == tries:
+                raise
+            time.sleep(0.5)
+
+
+def _generate_once(purpose, parts, system, schema):
     if purpose not in {'transcription', 'conversation'}:
         raise ProviderError('This API purpose is not allowed.')
     ok, message = ready()
@@ -60,7 +79,7 @@ def generate(purpose, parts, system, schema):
         'Content-Type': 'application/json', 'x-goog-api-key': settings.GEMINI_API_KEY}, method='POST')
     begun = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=25) as response:
+        with urllib.request.urlopen(request, timeout=12 if purpose == 'transcription' else 25) as response:
             data = json.loads(response.read(1024 * 1024))
         metadata = data.get('usageMetadata', {})
         attempt.input_tokens = max(0, int(metadata.get('promptTokenCount', 0)))
@@ -80,10 +99,13 @@ def generate(purpose, parts, system, schema):
                     400: 'Gemini rejected the request. Check the model and audio format.',
                     403: 'Gemini access denied. Check the key, API project and regional access.',
                     404: 'The configured Gemini model is unavailable for this project.'}
-        raise ProviderError(messages.get(exc.code, 'Gemini is temporarily unavailable. Retry this step.')) from None
-    except (urllib.error.URLError, TimeoutError, OSError):
+        logger.warning('Gemini %s failed: HTTP %s; usage reservation retained', purpose, exc.code)
+        message = messages.get(exc.code, f'Gemini returned HTTP {exc.code}. Retry this step shortly.')
+        raise ProviderError(message, retryable=exc.code in {500, 502, 503, 504}, http_status=exc.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
         attempt.status = 'Unknown'
-        raise ProviderError('Gemini connection failed or timed out. Check your connection and retry.') from None
+        logger.warning('Gemini %s failed: %s; usage reservation retained', purpose, type(exc).__name__)
+        raise ProviderError('Gemini connection failed or timed out. Your turn was not advanced. Retry shortly.', retryable=True) from None
     except (ValueError, KeyError, IndexError, TypeError):
         attempt.status = 'Failed'
         raise ProviderError('Gemini returned an unreadable response. This turn was not advanced. Retry this step.') from None

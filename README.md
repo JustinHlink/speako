@@ -124,11 +124,11 @@ Gemini is used only for speech-to-text and for the partner's replies. The projec
 
 ## Submission and demo version
 
-Until the integration PR is merged, use the integration/demo-20261104 branch
-for the complete restaurant demo. The default branch may not include every demo
-feature yet. A new checkout needs dependencies, migrations, seed_demo_users and
-its own local .env. API keys, passwords, databases and recordings are excluded
-from the repository.
+For assessment, use the fixed tag `submission-sprint3-2026-11-04` after it is
+published, or the exact commit linked in the submission document. New work goes
+through feature PRs and develop; tested submission changes are merged into main.
+Do not move an existing submission tag. A new checkout needs dependencies,
+migrations, seeded accounts and a private local .env.
 
 The app runs on localhost; a GitHub URL is source code, not a hosted website.
 An instructor can follow sections 1–4 on their computer. A working unbilled
@@ -153,3 +153,23 @@ or paid fallback. See docs/reply-recovery.md.
 This candidate contains the restaurant lesson. Other scenarios are not claimed
 as completed by this demo. Review and curriculum interfaces without a completed
 UI should not be listed in the learner demo script as working pages.
+
+## Provider errors and recovery
+
+Speech recognition retries once for a transient network failure or HTTP
+500/502/503/504 response, with a 12-second timeout per attempt. Both network
+attempts reserve budget separately. Quota/key/request-format errors do not
+retry automatically. The server logs the HTTP status or exception category,
+never the API key or raw audio.
+
+If recognition still fails, Retry this recording resends the audio retained in
+browser memory for the current attempt. Recording again replaces it; successful
+recognition clears it. Reloading the page loses the retained recording. Neither
+failed recognition nor retry advances a conversation turn. Conversation-provider
+errors preserve the confirmed transcript for a manual Continue retry.
+
+No paid fallback or alternate provider is enabled. External service failures can
+still prevent live recognition or replies; a tag and passing simulated tests do
+not guarantee Gemini availability. Supply the instructor's key privately in
+.env, or let the instructor configure their own unbilled project. Never commit
+credentials or publish them in the submission document.

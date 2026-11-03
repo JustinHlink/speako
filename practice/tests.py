@@ -40,11 +40,13 @@ class BudgetTests(TestCase):
 
     @patch('urllib.request.urlopen', side_effect=TimeoutError)
     def test_failed_request_remains_in_project_ledger(self, network):
-        with self.assertRaises(ProviderError):
-            generate('transcription', [], '', {})
-        attempt = ApiUsage.objects.get()
-        self.assertEqual(attempt.status, 'Unknown')
-        self.assertEqual(attempt.reserved_usd, 0.02)
+        with patch('practice.gemini.time.sleep'):
+            with self.assertRaises(ProviderError):
+                generate('transcription', [], '', {})
+        self.assertEqual(ApiUsage.objects.count(), 2)
+        for attempt in ApiUsage.objects.all():
+            self.assertEqual(attempt.status, 'Unknown')
+            self.assertEqual(attempt.reserved_usd, 0.02)
 
     @override_settings(GEMINI_FREE_TIER_CONFIRMED=False)
     @patch('urllib.request.urlopen')
