@@ -203,7 +203,7 @@ class VocabularyEndpointTests(TestCase):
     def fake_gemini(self, network, reply):
         body = {'usageMetadata': {'promptTokenCount': 900, 'candidatesTokenCount': 30},
                 'candidates': [{'content': {'parts': [{'text': json.dumps(reply)}]}}]}
-        network.return_value.__enter__.return_value = io.BytesIO(json.dumps(body).encode())
+        network.return_value.__enter__.side_effect = lambda: io.BytesIO(json.dumps(body).encode())
 
     @override_settings(GEMINI_API_KEY='test-only', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite')
     @patch('urllib.request.urlopen')
@@ -224,4 +224,6 @@ class VocabularyEndpointTests(TestCase):
         attempt = self.started_attempt()
         self.assertEqual(self.reply(attempt).status_code, 422)
         self.assertFalse(Turn.objects.exists())
-        self.assertEqual(ApiUsage.objects.get().status, 'Validation rejected')
+        self.assertEqual(ApiUsage.objects.count(), 2)
+        self.assertTrue(all(row.status == 'Validation rejected' for row in ApiUsage.objects.all()))
+        self.assertEqual(network.call_count, 2)

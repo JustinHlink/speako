@@ -33,16 +33,11 @@ python3 -m venv .venv
 
 ### Optional: Conda
 
-If you prefer Conda over `venv`, create and activate the environment using `environment.yml` (configured with Python 3.10 and matching `requirements.txt`):
-
-```bash
-conda env create -f environment.yml
-conda activate speako
-```
-
-When using Conda:
-- Follow steps 2 through 6 using `python manage.py ...` inside the activated `speako` environment instead of the `.venv` paths.
-- On Windows, you can also launch the app by running `powershell -NoProfile -File .\start_conda.ps1` or double-clicking `start_conda.bat`.
+Instead of venv, run `conda env create -f environment.yml` and
+`conda activate speako`. Use `python manage.py ...` in the activated environment
+in place of the .venv Python paths below. Windows users can use
+`start_conda.bat` or `start_conda.ps1`. The recommended assessment path is venv;
+Conda scripts have been reviewed but not executed on this computer.
 
 ## 2. Configure
 
@@ -61,18 +56,18 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py seed_demo_users --password <choose-a-password>
+.\.venv\Scripts\python.exe manage.py seed_demo_users --password "YOUR_DEMO_PASSWORD"
 ```
 
 macOS or Linux:
 
 ```bash
 .venv/bin/python manage.py migrate
-.venv/bin/python manage.py seed_demo_users --password <choose-a-password>
+.venv/bin/python manage.py seed_demo_users --password "YOUR_DEMO_PASSWORD"
 ```
 
 - `migrate` creates the tables and the restaurant lesson with its word lists.
-- `seed_demo_users` creates the demo accounts. There is no public sign-up.
+- `seed_demo_users` creates the demo accounts. The demo uses pre-created accounts; the registration API always creates Learners.
 
 | Username | Role |
 |---|---|
@@ -85,8 +80,8 @@ All four accounts use the password you choose (8 or more characters). You can al
 
 ## 4. Run
 
-- Windows: double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`. (If using Conda, double-click `start_conda.bat` or run `powershell -NoProfile -File .\start_conda.ps1`.)
-- macOS or Linux: run `.venv/bin/python manage.py runserver 127.0.0.1:8001` (or `python manage.py runserver 127.0.0.1:8001` in your activated Conda environment).
+- Windows: double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`.
+- macOS or Linux: run `.venv/bin/python manage.py runserver 127.0.0.1:8001 --insecure --noreload`.
 
 Open http://127.0.0.1:8001/ in Chrome or Edge, sign in with a demo account and allow the microphone. Keep the terminal open while you use the app. Ctrl+C stops it. Restart the app after you change `.env`.
 
@@ -133,3 +128,56 @@ Gemini is used only for speech-to-text and for the partner's replies. The projec
 - `practice/`: the app (models, views, the progress rule in `progress.py`, the Gemini client, the vocabulary check), its templates, static files and tests
 - `speako/`: Django settings and URLs
 - `docs/`: the test plan and notes from the October prototype
+
+
+## Submission and demo version
+
+For assessment, use the fixed tag `submission-sprint3-2026-11-04` after it is
+published, or the exact commit linked in the submission document. New work goes
+through feature PRs and develop; tested submission changes are merged into main.
+Do not move an existing submission tag. A new checkout needs dependencies,
+migrations, seeded accounts and a private local .env.
+
+The app runs on localhost; a GitHub URL is source code, not a hosted website.
+An instructor can follow sections 1–4 on their computer. A working unbilled
+Gemini project is required for live speech recognition and replies. A Gemini
+chat subscription does not configure API access. No API key is included in
+submission files. Use the instructor's own project or arrange authorized access
+privately, and retain the project's usage accounting when switching the single
+live environment. Do not copy the old prototype database into the new schema.
+
+For live demonstration: sign in as learner1, select the restaurant, record,
+discard one transcript, record again, confirm, repeat the reply slowly, finish
+five accepted turns, inspect the summary, then sign out and back in. Sign in as
+learner2 to verify isolation. Frontend tests use simulated browser devices; an
+actual microphone and voice playback still need checking on the demo computer.
+
+The fixed beginner list includes service function words and common contractions.
+An off-list AI candidate is hidden and may be rewritten once through the same
+budget guard. Invalid candidates never advance a turn; a second rejection or
+provider failure keeps the transcript for retry. There is no unlimited retry
+or paid fallback. See docs/reply-recovery.md.
+
+This candidate contains the restaurant lesson. Other scenarios are not claimed
+as completed by this demo. Review and curriculum interfaces without a completed
+UI should not be listed in the learner demo script as working pages.
+
+## Provider errors and recovery
+
+Speech recognition retries once for a transient network failure or HTTP
+500/502/503/504 response, with a 12-second timeout per attempt. Both network
+attempts reserve budget separately. Quota/key/request-format errors do not
+retry automatically. The server logs the HTTP status or exception category,
+never the API key or raw audio.
+
+If recognition still fails, Retry this recording resends the audio retained in
+browser memory for the current attempt. Recording again replaces it; successful
+recognition clears it. Reloading the page loses the retained recording. Neither
+failed recognition nor retry advances a conversation turn. Conversation-provider
+errors preserve the confirmed transcript for a manual Continue retry.
+
+No paid fallback or alternate provider is enabled. External service failures can
+still prevent live recognition or replies; a tag and passing simulated tests do
+not guarantee Gemini availability. Supply the instructor's key privately in
+.env, or let the instructor configure their own unbilled project. Never commit
+credentials or publish them in the submission document.

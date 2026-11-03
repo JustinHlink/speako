@@ -1,0 +1,87 @@
+{
+  "audio_source": "Locally synthesized English test speech; real Gemini calls; no provider mocks",
+  "steps": [
+    {
+      "step": "start",
+      "status": 200,
+      "seconds": 0.01
+    },
+    {
+      "step": "transcribe_1",
+      "status": 200,
+      "seconds": 11.88,
+      "transcript": "Yes, please."
+    },
+    {
+      "step": "reply_1",
+      "status": 200,
+      "seconds": 6.37,
+      "reply": "Hello. Can I have your order from the menu?"
+    },
+    {
+      "step": "transcribe_2",
+      "status": 200,
+      "seconds": 4.9,
+      "transcript": "I would like chicken with rice, please."
+    },
+    {
+      "step": "reply_2",
+      "status": 200,
+      "seconds": 6.3,
+      "reply": "That sounds good. Would you like some soup or water with your meal?"
+    },
+    {
+      "step": "transcribe_3",
+      "status": 200,
+      "seconds": 14.87,
+      "transcript": "Can I have some water, please?"
+    },
+    {
+      "step": "reply_3",
+      "status": 200,
+      "seconds": 1.69,
+      "reply": "Certainly. Would you like anything else?"
+    },
+    {
+      "step": "transcribe_4",
+      "status": 200,
+      "seconds": 1.38,
+      "transcript": "No, thank you."
+    },
+    {
+      "step": "reply_4",
+      "status": 200,
+      "seconds": 0.64,
+      "reply": "Okay. Would you like the bill now?"
+    },
+    {
+      "step": "transcribe_5",
+      "status": 200,
+      "seconds": 3.46,
+      "transcript": "Can I have the bill, please?"
+    },
+    {
+      "step": "reply_5",
+      "status": 200,
+      "seconds": 10.68,
+      "reply": "Certainly. Thank you for your order and enjoy your meal. Goodbye."
+    }
+  ],
+  "result": "passed",
+  "saved_summary": {
+    "used": [
+      "chicken",
+      "rice",
+      "water",
+      "bill",
+      "please"
+    ],
+    "unused": [
+      "menu",
+      "soup",
+      "tea"
+    ],
+    "corrections": []
+  },
+  "guard_plus_external_usd": 2.5
+}

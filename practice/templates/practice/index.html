@@ -7,10 +7,11 @@
   <link rel="stylesheet" href="{% static 'practice/app.css' %}">
   <script defer src="{% static 'practice/protocol.js' %}"></script>
   <script defer src="{% static 'practice/speech.js' %}"></script>
+  <script defer src="{% static 'practice/map.js' %}"></script>
   <script defer src="{% static 'practice/app.js' %}"></script>
 </head>
 <body>
-  <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local prototype · v0.1.1</span></header>
+  <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local practice</span></header>
   <main>
     <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's order something.</h1><p class="subtitle">Practice a simple restaurant conversation, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
     <section class="setup" aria-label="Account">
@@ -23,14 +24,15 @@
       <button id="sign-out" class="secondary" hidden>Sign out</button>
     </section>
     <div id="setup" class="setup" role="status" hidden></div>
+    <section class="lesson-card" aria-label="Learning map"><h2>Choose a lesson</h2><div id="lesson-list" class="row"></div><p id="map-status" role="status" hidden></p><button id="map-retry" class="secondary" hidden>Retry loading lessons</button></section>
     <div class="workspace">
       <aside class="lesson-card">
-        <div class="restaurant-icon" aria-hidden="true">☕</div><p class="eyebrow">YOUR SCENARIO</p><h2>Ordering at a Restaurant</h2>
+        <div class="restaurant-icon" aria-hidden="true">☕</div><p class="eyebrow">YOUR SCENARIO</p><h2 id="lesson-title">Ordering at a Restaurant</h2>
         <p id="goal">Order food and a drink politely, then ask for the bill.</p>
-        <div class="lesson-meta"><span>Beginner English</span><span>5 exchanges</span><span id="lesson-progress" hidden></span></div>
+        <div class="lesson-meta"><span>Beginner English</span><span id="lesson-turn-limit">5 exchanges</span><span id="lesson-progress" hidden></span></div>
         <h3>Today's menu</h3><ul class="menu"><li>Chicken with rice</li><li>Soup</li><li>Water</li><li>Tea</li></ul>
         <h3>Target words</h3><div id="vocabulary" class="word-list"></div>
-        <p class="grammar">Try: “I would like…” or “Can I have…?”</p>
+        <p id="lesson-grammar" class="grammar">Try: “I would like…” or “Can I have…?”</p>
         <button id="start" class="primary">Start practice <span aria-hidden="true">→</span></button>
         <button id="view-summary" class="secondary" hidden>View last summary</button>
         <p class="quiet">Check the transcript before the AI evaluates your answer. No pronunciation grading.</p>
@@ -44,7 +46,7 @@
         <div id="error" class="error" role="alert" hidden></div>
         <div class="recording-panel"><div class="row"><div class="state"><span id="state-dot" class="state-dot"></span><span id="state" role="status">Start a lesson to speak</span></div><div id="time-microphone" class="timing">Mic ready · — / target ≤ 1 s</div></div>
           <div class="meter" aria-hidden="true"><div id="meter-fill"></div></div>
-          <div class="record-actions"><button id="record" class="primary" disabled>Record answer</button><button id="stop" class="danger" disabled>Stop recording</button><span id="record-duration">Up to 30 seconds</span></div>
+          <div class="record-actions"><button id="record" class="primary" disabled>Record answer</button><button id="stop" class="danger" disabled>Stop recording</button><span id="record-duration">Up to 30 seconds</span><button id="retry-recognition" class="secondary" hidden>Retry this recording</button></div>
           <div class="row timing-row"><div id="time-transcription" class="timing">Recognition · — / target ≤ 5 s</div><div id="time-ai_reply" class="timing">AI response · — / target ≤ 5 s</div><div id="time-system_total" class="timing">System wait · — / target ≤ 11 s</div></div>
           <button id="exit" class="text-button" disabled>Exit lesson</button>
         </div>
