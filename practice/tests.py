@@ -1,9 +1,10 @@
+from datetime import timezone
 import io
 import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import *
+from .models import Turn, Flag, ApiUsage, User, Lesson, LessonAttempt
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -216,6 +217,27 @@ class FlagSystemTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
+        flag.refresh_from_db()
+        self.assertEqual(flag.status, 'Acceptable')
+        self.assertEqual(flag.reviewer, self.reviewer)
+
+    def test_review_flag_already_reviewed_returns_409(self):
+        reviewer2 = User.objects.create_user(username='reviewer_2', password='password', role='Reviewer')
+        
+        flag = Flag.objects.create(
+            turn=self.turn,
+            status='Acceptable',
+            reviewer=self.reviewer
+        )
+
+        self.client.force_login(reviewer2)
+        response = self.client.post(
+            '/api/flag/review/',
+            json.dumps({'flag_id': flag.id, 'status': 'Incorrect'}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 409)
         flag.refresh_from_db()
         self.assertEqual(flag.status, 'Acceptable')
         self.assertEqual(flag.reviewer, self.reviewer)
