@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import User, Lesson, LessonWord, SharedBeginnerWord, LessonAttempt, Turn, Correction, LessonSummary, Flag, ApiUsage
-from . import gemini, vocabulary, providers, transcripts
+from . import gemini, progress, vocabulary, providers, transcripts
 from .lesson import LESSON, ALLOWED, TARGETS, outside_words, make_summary
 
 
@@ -131,24 +131,30 @@ def api_login(request):
     Inputs: username, password -> Account role & new authenticated session.
     """
     data = body(request)
-    username = data.get('username')
+    username = data.get('username', '').strip()
     password = data.get('password')
+
+    if not isinstance(username, str) or not username.strip():
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username must be a non-empty string.'}}, status=400)
     
-    if not username or not password:
-        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username and password required.'}}, status=400)
-    
+    if not isinstance(password, str) or not password:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Password must be a non-empty string.'}}, status=400)
+
+    username = username.strip()
+
     user = authenticate(request, username=username, password=password)
     if user is None:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid credentials.'}}, status=401)
-    
+        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid username or password.'}}, status=401)
+
     login(request, user)
+
     return JsonResponse({
         'user': {
             'id': user.id,
             'username': user.username,
             'role': user.role
         }
-    })
+    }, status=200)
 
 
 @require_POST
@@ -158,10 +164,69 @@ def api_logout(request):
     Clear authenticated session and private browser state.
     """
     if not request.user.is_authenticated:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'No active session.'}}, status=401)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'UNAUTHORIZED',
+                'message': 'No active session found.'
+            }
+        }, status=401)
+
     logout(request)
+
     return JsonResponse({}, status=204)
+
+@require_POST
+def api_register(request):
+    """
+    A03: POST /api/auth/register/
+    Register a new user with the specified role (default is Learner).
+    """
+    data = body(request)
+    username = data.get('username', '').strip()
+    password = data.get('password')
+    role = data.get('role', 'Learner').strip()
+
+    if not username or not password:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'Username and password are required.'
+            }
+        }, status=400)
+
+    allowed_roles = [choice[0] for choice in User.ROLE_CHOICES]
+    if role not in allowed_roles:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_ROLE',
+                'message': f'Role must be one of {allowed_roles}.'
+            }
+        }, status=400)
+
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({
+            'error': {
+                'code': 'CONFLICT',
+                'message': 'Username already exists.'
+            }
+        }, status=409)
+
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        role='Learner'  # Always hardcoded to Learner
+    )
+
+    login(request, user)
+
+    return JsonResponse({
+        'message': 'User created successfully.',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role
+        }
+    }, status=201)
 
 @require_GET
 @require_role(['Learner'])
@@ -170,7 +235,20 @@ def list_lessons(request):
     L01: GET /api/lessons/
     Return all Published lessons with map status computed per learner (DR-03).
     """
-    return JsonResponse({'lessons': []})
+    published_lessons = list(Lesson.objects.filter(status='Published').order_by('id'))
+    statuses = progress.map_statuses(request.user, published_lessons)
+
+    lessons_data = []
+    for l in published_lessons:
+        lessons_data.append({
+            'id': l.id,
+            'scenario': l.scenario,
+            'grammar_goal': l.grammar_goal,
+            'turn_limit': l.turn_limit,
+            'status_on_map': statuses[l.id]
+        })
+
+    return JsonResponse({'lessons': lessons_data})
 
 
 @require_GET
@@ -180,7 +258,25 @@ def get_lesson_detail(request, lesson_id):
     L02: GET /api/lessons/{id}/
     Return available lesson details and latest completed attempt ID.
     """
-    return JsonResponse({'lesson': {}})
+    try:
+        lesson = Lesson.objects.get(pk=lesson_id, status='Published')
+    except Lesson.DoesNotExist:
+        return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Published lesson not found.'}}, status=404)
+
+    target_words = list(lesson.words.values_list('word', flat=True))
+
+    last_completed_attempt = progress.latest_completed_attempt(request.user, lesson)
+
+    return JsonResponse({
+        'lesson': {
+            'id': lesson.id,
+            'scenario': lesson.scenario,
+            'grammar_goal': lesson.grammar_goal,
+            'turn_limit': lesson.turn_limit,
+            'target_words': target_words,
+            'last_completed_attempt_id': str(last_completed_attempt.id) if last_completed_attempt else None
+        }
+    })
 
 
 @require_GET
@@ -215,7 +311,7 @@ def start_lesson(request):
     if not isinstance(lesson_id, int):
         return error(400, 'INVALID_INPUT', 'lesson_id is required.')
     lesson = Lesson.objects.filter(pk=lesson_id).first()
-    if lesson is None or not vocabulary.lesson_is_configured(lesson):
+    if lesson is None or not vocabulary.lesson_is_configured(lesson) or vocabulary.outside_words(OPENING_LINE, lesson):
         return error(409, 'LESSON_UNAVAILABLE', 'This lesson is not ready yet. Choose another lesson.')
 
     with transaction.atomic():
@@ -411,7 +507,33 @@ def submit_flag(request):
     POST /api/flag/submit/
     Learner flags an inappropriate or incorrect Turn ('This felt wrong').
     """
-    return JsonResponse({'message': 'Flag submitted successfully.'}, status=201)
+    data = body(request)
+    turn_id = data.get('turn_id')
+    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool) or not 0 < turn_id <= 9223372036854775807:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'turn_id must be a valid integer.'
+            }
+        }, status=400)
+    try:
+        turn = Turn.objects.get(pk=turn_id, attempt__learner=request.user)
+    except Turn.DoesNotExist:
+        return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Turn not found or access denied.'}}, status=404)
+
+    flag, created = Flag.objects.get_or_create(turn=turn, defaults={'status': 'Unresolved'})
+    if not created:
+        return JsonResponse({'error': {'code': 'CONFLICT', 'message': 'This turn has already been flagged.'}}, status=409)
+
+    return JsonResponse({
+        'message': 'Flag submitted successfully.',
+        'flag': {
+            'id': flag.id,
+            'turn_id': turn.id,
+            'status': flag.status,
+            'flagged_at': flag.flagged_at.isoformat()
+        }
+    }, status=201)
 
 
 @require_GET
@@ -421,7 +543,18 @@ def list_flags(request):
     GET /api/flag/list/
     Reviewer fetches list of Unresolved flagged turns (US-13 AC1).
     """
-    return JsonResponse({'flags': []})
+    unresolved_flags = Flag.objects.filter(status='Unresolved').select_related('turn', 'turn__attempt__lesson')
+    flag_list = []
+    for f in unresolved_flags:
+        flag_list.append({
+            'id': f.id,
+            'turn_id': f.turn.id,
+            'scenario': f.turn.attempt.lesson.scenario,
+            'learner_text': f.turn.learner_text,
+            'ai_reply': f.turn.ai_reply,
+            'flagged_at': f.flagged_at.isoformat(),
+        })
+    return JsonResponse({'flags': flag_list})
 
 
 @require_POST
@@ -431,7 +564,39 @@ def review_flag(request):
     POST /api/flag/review/
     Reviewer marks a Flag as 'Acceptable' or 'Incorrect' (US-13 AC2).
     """
-    return JsonResponse({'message': 'Flag reviewed successfully.'})
+    data = body(request)
+    flag_id = data.get('flag_id')
+    new_status = data.get('status')
+
+    if new_status not in ['Acceptable', 'Incorrect']:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Status must be Acceptable or Incorrect.'}}, status=400)
+
+    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool) or not 0 < flag_id <= 9223372036854775807:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'flag_id must be a valid integer.'
+            }
+        }, status=400)
+    
+    reviewed_at = timezone.now()
+    changed = Flag.objects.filter(pk=flag_id, status='Unresolved').update(
+        status=new_status, reviewer=request.user, reviewed_at=reviewed_at)
+    if not changed:
+        if Flag.objects.filter(pk=flag_id).exists():
+            return error(409, 'CONFLICT', 'This flag has already been reviewed and cannot be overwritten.')
+        return error(404, 'NOT_FOUND', 'Unresolved flag record not found.')
+    flag = Flag.objects.get(pk=flag_id)
+
+    return JsonResponse({
+        'message': 'Flag reviewed successfully.',
+        'flag': {
+            'id': flag.id,
+            'status': flag.status,
+            'reviewer': request.user.username,
+            'reviewed_at': flag.reviewed_at.isoformat()
+        }
+    })
 
 
 @require_GET
