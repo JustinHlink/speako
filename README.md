@@ -31,6 +31,19 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
+### Optional: Conda
+
+If you prefer Conda over `venv`, create and activate the environment using `environment.yml` (configured with Python 3.10 and matching `requirements.txt`):
+
+```bash
+conda env create -f environment.yml
+conda activate speako
+```
+
+When using Conda:
+- Follow steps 2 through 6 using `python manage.py ...` inside the activated `speako` environment instead of the `.venv` paths.
+- On Windows, you can also launch the app by running `powershell -NoProfile -File .\start_conda.ps1` or double-clicking `start_conda.bat`.
+
 ## 2. Configure
 
 Copy `.env.example` to `.env` (Windows: `copy .env.example .env`, macOS or Linux: `cp .env.example .env`). Then set these two values in `.env`:
@@ -72,8 +85,8 @@ All four accounts use the password you choose (8 or more characters). You can al
 
 ## 4. Run
 
-- Windows: double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`.
-- macOS or Linux: run `.venv/bin/python manage.py runserver 127.0.0.1:8001`.
+- Windows: double-click `start.bat`, or run `powershell -NoProfile -File .\start.ps1`. (If using Conda, double-click `start_conda.bat` or run `powershell -NoProfile -File .\start_conda.ps1`.)
+- macOS or Linux: run `.venv/bin/python manage.py runserver 127.0.0.1:8001` (or `python manage.py runserver 127.0.0.1:8001` in your activated Conda environment).
 
 Open http://127.0.0.1:8001/ in Chrome or Edge, sign in with a demo account and allow the microphone. Keep the terminal open while you use the app. Ctrl+C stops it. Restart the app after you change `.env`.
 
