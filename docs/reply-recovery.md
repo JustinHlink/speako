@@ -16,3 +16,5 @@ are at most two reply-generation calls per Continue, each with its own budget
 reservation. It does not expand the allowed vocabulary, generate a scripted
 substitute, or guarantee model correctness. Semantic feedback still needs live
 validation. Tests cover both successful recovery and bounded failure.
+
+The shared beginner list was missing basic service language (including see and all). Migrations 0003/0004 add a fixed, reviewed list of common function words; lesson target lists stay unchanged. Common contractions are normalized before token checks. Domain words such as sparkling are still rejected. A live water-order response passed after this revision; this is a sample, not a reliability guarantee.

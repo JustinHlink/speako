@@ -7,6 +7,17 @@ BAD = {**GOOD, 'reply': 'Would you like sparkling water?'}
 
 
 class ReplyRecoveryTests(WorkflowFixture):
+    def test_normal_water_and_menu_reply_uses_shared_beginner_words(self):
+        from .views import reply_problem
+        candidate = {**GOOD, 'reply': 'Sure, I will bring the water. Would you like to see the menu for anything else?'}
+        self.assertIsNone(reply_problem(candidate, self.lesson))
+
+    def test_common_service_phrases_and_contractions_pass_without_domain_expansion(self):
+        from .views import reply_problem
+        for text in ["Sure. Would you like anything else, or is that all?", "Here's your water. Is there anything else you'd like?"]:
+            self.assertIsNone(reply_problem({**GOOD, 'reply': text}, self.lesson))
+        self.assertIsNotNone(reply_problem(BAD, self.lesson))
+
     @patch('practice.providers.reply')
     def test_off_list_candidate_is_rewritten_before_one_turn_is_saved(self, provider):
         usage = ApiUsage.objects.create(call_type='Reply', environment_id='test', reserved_usd=.02)

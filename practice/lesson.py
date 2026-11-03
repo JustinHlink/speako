@@ -20,6 +20,11 @@ TARGETS = {'microphone': 1000, 'transcription': 5000, 'ai_reply': 5000, 'playbac
 def words(text):
     text = text.lower().replace('’', "'")
     contractions = {"i'm": 'i am', "i'd": 'i would', "i'll": 'i will', "don't": 'do not', "can't": 'can not', "you're": 'you are', "it's": 'it is', "that's": 'that is', "we're": 'we are', "let's": 'let us'}
+    contractions.update({"you'd": 'you would', "you'll": 'you will', "we'll": 'we will',
+                         "i've": 'i have', "you've": 'you have', "we've": 'we have',
+                         "here's": 'here is', "there's": 'there is', "what's": 'what is',
+                         "isn't": 'is not', "aren't": 'are not', "doesn't": 'does not',
+                         "didn't": 'did not', "won't": 'will not', "wouldn't": 'would not'})
     for short, expanded in contractions.items():
         text = re.sub(r'\b' + re.escape(short) + r'\b', expanded, text)
     return re.findall(r"[a-z]+", text)
