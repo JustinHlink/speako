@@ -71,22 +71,17 @@ def api_login(request):
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
 
-    if not username or not password:
-        return JsonResponse({
-            'error': {
-                'code': 'INVALID_INPUT',
-                'message': 'Both username and password are required.'
-            }
-        }, status=400)
+    if not isinstance(username, str) or not username.strip():
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username must be a non-empty string.'}}, status=400)
+    
+    if not isinstance(password, str) or not password:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Password must be a non-empty string.'}}, status=400)
+
+    username = username.strip()
 
     user = authenticate(request, username=username, password=password)
     if user is None:
-        return JsonResponse({
-            'error': {
-                'code': 'UNAUTHORIZED',
-                'message': 'Invalid username or password.'
-            }
-        }, status=401)
+        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid username or password.'}}, status=401)
 
     login(request, user)
 
@@ -117,7 +112,7 @@ def api_logout(request):
 
     return JsonResponse({}, status=204)
 
-require_POST
+@require_POST
 def api_register(request):
     """
     A03: POST /api/auth/register/
@@ -156,7 +151,7 @@ def api_register(request):
     user = User.objects.create_user(
         username=username,
         password=password,
-        role=role
+        role='Learner'  # Always hardcoded to Learner
     )
 
     login(request, user)

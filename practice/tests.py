@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import *
+from .models import ApiUsage, User
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -230,6 +230,18 @@ class AuthenticationTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 409)
+
+    def test_register_ignores_requested_role_and_forces_learner(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'hacker_user', 'password': 'password123', 'role': 'Curator'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        
+        user = User.objects.get(username='hacker_user')
+        self.assertEqual(user.role, 'Learner')
+        self.assertNotEqual(user.role, 'Curator')
 
 
 class SummaryTests(TestCase):
