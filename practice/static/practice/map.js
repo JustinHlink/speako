@@ -2,29 +2,47 @@
 globalThis.SpeakoMap = {
   async load(onSelect) {
     const host = document.getElementById('lesson-list');
-    host.replaceChildren();
-    const response = await fetch('/api/lessons/');
-    if (!response.ok) return;
-    const {lessons} = await response.json();
-    for (const lesson of lessons) {
-      const button = document.createElement('button');
-      button.className = 'secondary lesson-option';
-      button.textContent = lesson.scenario + ' · ' + lesson.status_on_map;
-      button.onclick = async () => {
-        button.disabled = true;
-        try {
-          const detail = await fetch('/api/lessons/' + lesson.id + '/');
-          const data = await detail.json();
-          if (!detail.ok) throw new Error(SpeakoProtocol.error(data.error));
-          await onSelect({...data.lesson, status_on_map:lesson.status_on_map});
-        } catch (error) {
-          const banner = document.getElementById('error');
-          banner.textContent = error.message;
-          banner.hidden = false;
-        } finally { button.disabled = false; }
-      };
-      host.append(button);
+    const notice = document.getElementById('map-status');
+    const retry = document.getElementById('map-retry');
+    retry.onclick = () => this.load(onSelect);
+    retry.disabled = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch('/api/lessons/', {signal: controller.signal});
+      if (!response.ok) throw new Error('Lessons could not be loaded.');
+      const {lessons} = await response.json();
+      if (!Array.isArray(lessons)) throw new Error('Invalid lesson list.');
+      host.replaceChildren();
+      for (const lesson of lessons) {
+        const button = document.createElement('button');
+        button.className = 'secondary lesson-option';
+        button.textContent = lesson.scenario + ' · ' + lesson.status_on_map;
+        button.onclick = async () => {
+          button.disabled = true;
+          try {
+            const detail = await fetch('/api/lessons/' + lesson.id + '/');
+            const data = await detail.json();
+            if (!detail.ok) throw new Error(SpeakoProtocol.error(data.error));
+            await onSelect({...data.lesson, status_on_map:lesson.status_on_map});
+          } catch (error) {
+            const banner = document.getElementById('error');
+            banner.textContent = error.message;
+            banner.hidden = false;
+          } finally { button.disabled = false; }
+        };
+        host.append(button);
+      }
+      if (!lessons.length) host.textContent = 'No lessons are available yet.';
+      notice.hidden = true;
+      retry.hidden = true;
+    } catch {
+      notice.textContent = 'Lessons could not be loaded. You can still continue your current lesson.';
+      notice.hidden = false;
+      retry.hidden = false;
+    } finally {
+      clearTimeout(timeout);
+      retry.disabled = false;
     }
-    if (!lessons.length) host.textContent = 'No lessons are available yet.';
   }
 };
