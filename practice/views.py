@@ -114,24 +114,30 @@ def api_login(request):
     Inputs: username, password -> Account role & new authenticated session.
     """
     data = body(request)
-    username = data.get('username')
+    username = data.get('username', '').strip()
     password = data.get('password')
+
+    if not isinstance(username, str) or not username.strip():
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username must be a non-empty string.'}}, status=400)
     
-    if not username or not password:
-        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username and password required.'}}, status=400)
-    
+    if not isinstance(password, str) or not password:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Password must be a non-empty string.'}}, status=400)
+
+    username = username.strip()
+
     user = authenticate(request, username=username, password=password)
     if user is None:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid credentials.'}}, status=401)
-    
+        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid username or password.'}}, status=401)
+
     login(request, user)
+
     return JsonResponse({
         'user': {
             'id': user.id,
             'username': user.username,
             'role': user.role
         }
-    })
+    }, status=200)
 
 
 @require_POST
@@ -141,10 +147,69 @@ def api_logout(request):
     Clear authenticated session and private browser state.
     """
     if not request.user.is_authenticated:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'No active session.'}}, status=401)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'UNAUTHORIZED',
+                'message': 'No active session found.'
+            }
+        }, status=401)
+
     logout(request)
+
     return JsonResponse({}, status=204)
+
+@require_POST
+def api_register(request):
+    """
+    A03: POST /api/auth/register/
+    Register a new user with the specified role (default is Learner).
+    """
+    data = body(request)
+    username = data.get('username', '').strip()
+    password = data.get('password')
+    role = data.get('role', 'Learner').strip()
+
+    if not username or not password:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'Username and password are required.'
+            }
+        }, status=400)
+
+    allowed_roles = [choice[0] for choice in User.ROLE_CHOICES]
+    if role not in allowed_roles:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_ROLE',
+                'message': f'Role must be one of {allowed_roles}.'
+            }
+        }, status=400)
+
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({
+            'error': {
+                'code': 'CONFLICT',
+                'message': 'Username already exists.'
+            }
+        }, status=409)
+
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        role='Learner'  # Always hardcoded to Learner
+    )
+
+    login(request, user)
+
+    return JsonResponse({
+        'message': 'User created successfully.',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role
+        }
+    }, status=201)
 
 @require_GET
 @require_role(['Learner'])
@@ -153,7 +218,35 @@ def list_lessons(request):
     L01: GET /api/lessons/
     Return all Published lessons with map status computed per learner (DR-03).
     """
-    return JsonResponse({'lessons': []})
+    published_lessons = Lesson.objects.filter(status='Published').order_by('id')
+    
+    user_attempts = LessonAttempt.objects.filter(learner=request.user)
+    
+    completed_lesson_ids = set(
+        user_attempts.filter(status='Completed').values_list('lesson_id', flat=True)
+    )
+    in_progress_lesson_ids = set(
+        user_attempts.filter(status__in=['In progress', 'Exited']).values_list('lesson_id', flat=True)
+    )
+
+    lessons_data = []
+    for l in published_lessons:
+        if l.id in completed_lesson_ids:
+            status_on_map = 'Completed'
+        elif l.id in in_progress_lesson_ids:
+            status_on_map = 'In progress'
+        else:
+            status_on_map = 'Not started'
+
+        lessons_data.append({
+            'id': l.id,
+            'scenario': l.scenario,
+            'grammar_goal': l.grammar_goal,
+            'turn_limit': l.turn_limit,
+            'status_on_map': status_on_map
+        })
+
+    return JsonResponse({'lessons': lessons_data})
 
 
 @require_GET
@@ -163,7 +256,29 @@ def get_lesson_detail(request, lesson_id):
     L02: GET /api/lessons/{id}/
     Return available lesson details and latest completed attempt ID.
     """
-    return JsonResponse({'lesson': {}})
+    try:
+        lesson = Lesson.objects.get(pk=lesson_id, status='Published')
+    except Lesson.DoesNotExist:
+        return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Published lesson not found.'}}, status=404)
+
+    target_words = list(lesson.words.values_list('word', flat=True))
+
+    last_completed_attempt = LessonAttempt.objects.filter(
+        learner=request.user,
+        lesson=lesson,
+        status='Completed'
+    ).order_by('-ended_at').first()
+
+    return JsonResponse({
+        'lesson': {
+            'id': lesson.id,
+            'scenario': lesson.scenario,
+            'grammar_goal': lesson.grammar_goal,
+            'turn_limit': lesson.turn_limit,
+            'target_words': target_words,
+            'last_completed_attempt_id': str(last_completed_attempt.id) if last_completed_attempt else None
+        }
+    })
 
 
 @require_GET
@@ -197,7 +312,7 @@ def start_lesson(request):
     if not isinstance(lesson_id, int):
         return error(400, 'INVALID_INPUT', 'lesson_id is required.')
     lesson = Lesson.objects.filter(pk=lesson_id).first()
-    if lesson is None or not vocabulary.lesson_is_configured(lesson):
+    if lesson is None or not vocabulary.lesson_is_configured(lesson) or vocabulary.outside_words(OPENING_LINE, lesson):
         return error(409, 'LESSON_UNAVAILABLE', 'This lesson is not ready yet. Choose another lesson.')
 
     with transaction.atomic():

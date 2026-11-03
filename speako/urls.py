@@ -6,6 +6,7 @@ urlpatterns = [
     
     path('api/auth/login/', views.api_login),
     path('api/auth/logout/', views.api_logout),
+    path('api/auth/register/', views.api_register),
     
     path('api/lessons/', views.list_lessons),
     path('api/lessons/<int:lesson_id>/', views.get_lesson_detail),
