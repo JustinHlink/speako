@@ -55,6 +55,14 @@ class MapStatusRuleTests(TestCase):
         latest = make_attempt(self.learner, self.restaurant, 'Completed')
         self.assertEqual(latest_completed_attempt(self.learner, self.restaurant), latest)
 
+    def test_completed_attempt_without_ended_at_is_skipped(self):
+        missing = make_attempt(self.learner, self.restaurant, 'Completed')
+        missing.ended_at = None
+        missing.save()
+        self.assertIsNone(latest_completed_attempt(self.learner, self.restaurant))
+        finished = make_attempt(self.learner, self.restaurant, 'Completed')
+        self.assertEqual(latest_completed_attempt(self.learner, self.restaurant), finished)
+
 
 class AccountProgressTests(TestCase):
     """US-16 AC1 to AC3 through the sign-in, start and reply endpoints."""
@@ -72,6 +80,12 @@ class AccountProgressTests(TestCase):
 
     def sign_out(self):
         self.assertEqual(self.post('/api/auth/logout/').status_code, 204)
+
+    def map_shows(self):
+        """The restaurant lesson's status as the learning map (L01) shows it."""
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 200)
+        return next(l['status_on_map'] for l in response.json()['lessons'] if l['id'] == self.restaurant.id)
 
     def start(self):
         response = self.post('/api/start/', {'lesson_id': self.restaurant.id})
@@ -94,15 +108,16 @@ class AccountProgressTests(TestCase):
         self.sign_out()
         self.sign_in('anna', 'anna-pass')
         self.assertEqual(int(self.client.session['_auth_user_id']), self.anna.pk)
-        self.assertEqual(map_status(self.anna, self.restaurant), 'Completed')
-        self.assertEqual(str(latest_completed_attempt(self.anna, self.restaurant).pk), attempt_id)
+        self.assertEqual(self.map_shows(), 'Completed')
+        detail = self.client.get(f'/api/lessons/{self.restaurant.id}/').json()['lesson']
+        self.assertEqual(detail['last_completed_attempt_id'], attempt_id)
 
     @patch('practice.gemini.generate', return_value=REPLY)
     def test_lesson_left_halfway_shows_in_progress_and_restarts_at_the_first_turn(self, provider):
         self.sign_in('anna', 'anna-pass')
         first = self.start()
         self.assertEqual(self.answer(first['attempt_id'], 1).status_code, 200)
-        self.assertEqual(map_status(self.anna, self.restaurant), 'In progress')
+        self.assertEqual(self.map_shows(), 'In progress')
 
         second = self.start()
         self.assertEqual(second['turns'], [])
@@ -110,7 +125,7 @@ class AccountProgressTests(TestCase):
         old = LessonAttempt.objects.get(pk=first['attempt_id'])
         self.assertEqual(old.status, 'Exited')
         self.assertEqual(old.turns.count(), 1)
-        self.assertEqual(map_status(self.anna, self.restaurant), 'In progress')
+        self.assertEqual(self.map_shows(), 'In progress')
 
     def test_second_learner_in_the_same_browser_sees_only_their_own_progress(self):
         anna_attempt = make_attempt(self.anna, self.restaurant, 'Completed')
@@ -118,8 +133,9 @@ class AccountProgressTests(TestCase):
         self.sign_out()
         self.sign_in('ben', 'ben-pass')
         self.assertEqual(int(self.client.session['_auth_user_id']), self.ben.pk)
-        self.assertEqual(map_status(self.ben, self.restaurant), 'Not started')
-        self.assertIsNone(latest_completed_attempt(self.ben, self.restaurant))
+        self.assertEqual(self.map_shows(), 'Not started')
+        detail = self.client.get(f'/api/lessons/{self.restaurant.id}/').json()['lesson']
+        self.assertIsNone(detail['last_completed_attempt_id'])
         response = self.post('/api/reply/', {'attempt_id': str(anna_attempt.pk), 'pending_id': 'x'})
         self.assertEqual(response.status_code, 404)
 

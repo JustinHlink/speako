@@ -4,6 +4,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
@@ -63,7 +64,8 @@ class LearningMapTests(TestCase):
         
         self.lesson2 = Lesson.objects.create(scenario='Customs', grammar_goal='Short answers', turn_limit=5, status='Published')
         
-        LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson1, status='Completed')
+        LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson1, status='Completed',
+                                     ended_at=timezone.now())
 
     def test_list_lessons_status_computation(self):
         self.client.force_login(self.learner)
@@ -71,8 +73,9 @@ class LearningMapTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         lessons = response.json()['lessons']
+        # Migration 0002 also seeds the restaurant lesson, so count Published lessons instead of fixing 2.
         self.assertEqual(len(lessons), Lesson.objects.filter(status='Published').count())
-        
+
         l1_data = next(l for l in lessons if l['id'] == self.lesson1.id)
         self.assertEqual(l1_data['status_on_map'], 'Completed')
         

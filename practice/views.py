@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import User, Lesson, LessonWord, SharedBeginnerWord, LessonAttempt, Turn, Correction, LessonSummary, Flag, ApiUsage
-from . import gemini, vocabulary, providers, transcripts
+from . import gemini, progress, vocabulary, providers, transcripts
 from .lesson import LESSON, ALLOWED, TARGETS, outside_words, make_summary
 
 
@@ -218,32 +218,17 @@ def list_lessons(request):
     L01: GET /api/lessons/
     Return all Published lessons with map status computed per learner (DR-03).
     """
-    published_lessons = Lesson.objects.filter(status='Published').order_by('id')
-    
-    user_attempts = LessonAttempt.objects.filter(learner=request.user)
-    
-    completed_lesson_ids = set(
-        user_attempts.filter(status='Completed').values_list('lesson_id', flat=True)
-    )
-    in_progress_lesson_ids = set(
-        user_attempts.filter(status__in=['In progress', 'Exited']).values_list('lesson_id', flat=True)
-    )
+    published_lessons = list(Lesson.objects.filter(status='Published').order_by('id'))
+    statuses = progress.map_statuses(request.user, published_lessons)
 
     lessons_data = []
     for l in published_lessons:
-        if l.id in completed_lesson_ids:
-            status_on_map = 'Completed'
-        elif l.id in in_progress_lesson_ids:
-            status_on_map = 'In progress'
-        else:
-            status_on_map = 'Not started'
-
         lessons_data.append({
             'id': l.id,
             'scenario': l.scenario,
             'grammar_goal': l.grammar_goal,
             'turn_limit': l.turn_limit,
-            'status_on_map': status_on_map
+            'status_on_map': statuses[l.id]
         })
 
     return JsonResponse({'lessons': lessons_data})
@@ -263,11 +248,7 @@ def get_lesson_detail(request, lesson_id):
 
     target_words = list(lesson.words.values_list('word', flat=True))
 
-    last_completed_attempt = LessonAttempt.objects.filter(
-        learner=request.user,
-        lesson=lesson,
-        status='Completed'
-    ).order_by('-ended_at').first()
+    last_completed_attempt = progress.latest_completed_attempt(request.user, lesson)
 
     return JsonResponse({
         'lesson': {
