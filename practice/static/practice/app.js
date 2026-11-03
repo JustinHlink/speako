@@ -73,6 +73,23 @@ function summary() {
   if(!data.corrections.length){const p=document.createElement('p');p.textContent='No corrections were made during this lesson.';panel.append(p);}
   for(const c of data.corrections){const p=document.createElement('p');p.textContent=`You said: ${c.original}\n${c.explanation}\nTry: ${c.example}`;p.style.whiteSpace='pre-wrap';panel.append(p);}
 }
+async function loadMap() {
+  if (globalThis.SpeakoMap) await SpeakoMap.load(async lesson => {
+    if(busy || speaking || recorder?.state==='recording') {error('Finish the current step first.');return;}
+    if(session?.status==='in_progress' && session.lesson_id!==lesson.id) {error('Exit the current lesson before choosing another.');return;}
+    lessonId=lesson.id;
+    progress={status:lesson.status_on_map,last_completed_attempt_id:lesson.last_completed_attempt_id};
+    if(session && session.lesson_id!==lessonId){session=null;lastReply='';$('messages').replaceChildren();}
+    reopenedSummary=null;
+    $('lesson-title').textContent=lesson.scenario;
+    $('goal').textContent=lesson.grammar_goal;
+    $('lesson-grammar').textContent=lesson.grammar_goal;
+    $('lesson-turn-limit').textContent=lesson.turn_limit+' exchanges';
+    $('vocabulary').replaceChildren();wordList($('vocabulary'),lesson.target_words);
+    error();render();
+  });
+}
+
 function render() {
   if(session?.progress)progress=session.progress;
   if(session){$('messages').replaceChildren();message(session.opening,'ai');for(const turn of session.turns){message(turn.learner,'learner');if(turn.correction)correction(turn.correction);message(turn.reply,'ai');}lastReply=session.turns.at(-1)?.reply || session.opening;}
@@ -133,14 +150,14 @@ $('view-summary').onclick=async()=>{error();try{const response=await fetch(`/api
 $('discard').onclick=async()=>{error();busy=true;controls();try{const result=await request('/api/discard/',SpeakoProtocol.confirmation(session));measure('confirmation',performance.now()-reviewStarted,'discarded');session=SpeakoProtocol.attempt(result.attempt);recognitionWait=0;render();state('Old transcript discarded. Record again.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('confirm').onclick=async()=>{
   error();measure('confirmation',performance.now()-reviewStarted);busy=true;controls();state('Your waiter is thinking…','processing');const begun=performance.now();
-  try{const result=await request('/api/reply/',SpeakoProtocol.confirmation(session));const replyWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);render();measure('ai_reply',replyWait,'success',result.server_ms);if(result.summary_ms!=null)measure('summary',result.summary_ms);
+  try{const result=await request('/api/reply/',SpeakoProtocol.confirmation(session));const replyWait=performance.now()-begun;session=SpeakoProtocol.attempt(result.attempt);render();measure('ai_reply',replyWait,'success',result.server_ms);if(result.summary_ms!=null)measure('summary',result.summary_ms);await loadMap();
     busy=false;await play(lastReply,1,playbackMs=>measure('system_total',recognitionWait+replyWait+playbackMs));
   }catch(e){measure('ai_reply',performance.now()-begun,'failed',e.serverMs);error(e.message);state('AI response failed — retry Continue');}finally{busy=false;controls();}
 };
 $('repeat').onclick=()=>{error();SpeakoSpeech.repeatSlower(lastReply, window.speechSynthesis, play);};
-$('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/',{attempt_id:session.id});session=SpeakoProtocol.attempt(result.attempt);render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
+$('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/',{attempt_id:session.id});session=SpeakoProtocol.attempt(result.attempt);render();state('Lesson exited. No summary was created.');await loadMap();}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.2',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
 $('sign-in-form').onsubmit=async event=>{event.preventDefault();error();try{await request('/api/auth/login/',{username:$('username').value,password:$('password').value});$('password').value='';location.reload();}catch(e){error(e.message);}};
 $('sign-out').onclick=async()=>{try{const response=await fetch('/api/auth/logout/',{method:'POST',headers:{'X-CSRFToken':csrf()}});if(!response.ok)throw new Error('Sign out failed.');session=null;localStorage.removeItem('speako-timing');location.reload();}catch(e){error(e.message);}};
 window.addEventListener('beforeunload',()=>{releaseMic();if('speechSynthesis' in window)speechSynthesis.cancel();});
-(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);lessonId=data.lesson.id;$('account-name').textContent=data.user ? 'Signed in as '+data.user.username : 'Sign in to practice';$('sign-out').hidden=!data.user;$('sign-in-form').hidden=!!data.user;ready=data.api_ready;session=SpeakoProtocol.attempt(data.attempt);progress=data.progress;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state(session.summary?'Your saved summary is available':'Lesson complete');else if(session?.status==='in_progress'){if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);}else state('Ready for your answer');}measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
+(async()=>{try{const response=await fetch('/api/status/');if(!response.ok)throw new Error('Could not load Speako.');const data=await response.json();Object.assign(targets,data.targets);lessonId=data.lesson.id;$('account-name').textContent=data.user ? 'Signed in as '+data.user.username : 'Sign in to practice';$('sign-out').hidden=!data.user;$('sign-in-form').hidden=!!data.user;ready=data.api_ready;session=SpeakoProtocol.attempt(data.attempt);progress=data.progress;usage(data.usage);wordList($('vocabulary'),data.lesson.target_words);if(globalThis.SpeakoMap){$('lesson-title').textContent=data.lesson.title;$('lesson-turn-limit').textContent=data.lesson.turn_limit+' exchanges';$('lesson-grammar').textContent=data.lesson.grammar;await loadMap();}$('setup').hidden=ready;$('setup').textContent=data.setup_message;render();if(session?.pending){reviewStarted=performance.now();state('Review your pending transcript');}else if(session?.status==='completed')state(session.summary?'Your saved summary is available':'Lesson complete');else if(session?.status==='in_progress'){if(await micDenied()){state('Microphone unavailable');error(micDeniedMessage);}else state('Ready for your answer');}measure('page_ready',performance.now());renderMeasurements();}catch(e){error(e.message);}})();
