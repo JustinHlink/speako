@@ -51,6 +51,7 @@ async function loadPage(attempt, mapMode = 'network') {
         if (mapMode === 'timeout') return new Promise((resolve,reject) => options.signal.addEventListener('abort',()=>reject(new Error('Aborted'))));
         if (mapMode === 'hang') return new Promise(() => {});
         if (mapMode === 'network') throw new Error('Network down');
+        if (mapMode === '401' || mapMode === '403') return {ok:false,status:Number(mapMode)};
         if (mapMode === 'http') return {ok:false};
         if (mapMode === 'json') return {ok:true,json:async()=>{throw new Error('Bad JSON');}};
         return {ok:true,json:async()=>({lessons:[]})};
@@ -94,6 +95,12 @@ async function loadPage(attempt, mapMode = 'network') {
     assert.equal(pending.elements.record.disabled,false);
     assert.equal(pending.elements.error?.hidden ?? true,true);
     assert.ok(!pending.elements.state.textContent.includes('failed'));
+  }
+  for (const mode of ['401','403']) {
+    const page = await loadPage(null,mode);
+    assert.match(page.elements['map-status'].textContent,/Sign in/);
+    assert.equal(page.elements['map-retry'].hidden,true);
+    assert.equal(page.elements['map-status'].hidden,false);
   }
   console.log('Map failure isolation checks passed (network, HTTP, JSON, hanging request, retry, startup and saved reply).');
 })().catch(error => {console.error(error);process.exit(1);});

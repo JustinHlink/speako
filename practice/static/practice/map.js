@@ -10,6 +10,15 @@ globalThis.SpeakoMap = {
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetch('/api/lessons/', {signal: controller.signal});
+      if (response.status === 401 || response.status === 403) {
+        host.replaceChildren();
+        notice.textContent = response.status === 401
+          ? 'Sign in above to choose a lesson.'
+          : 'Sign in with a learner account to choose a lesson.';
+        notice.hidden = false;
+        retry.hidden = true;
+        return;
+      }
       if (!response.ok) throw new Error('Lessons could not be loaded.');
       const {lessons} = await response.json();
       if (!Array.isArray(lessons)) throw new Error('Invalid lesson list.');
