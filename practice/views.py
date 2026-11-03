@@ -507,7 +507,37 @@ def submit_flag(request):
     POST /api/flag/submit/
     Learner flags an inappropriate or incorrect Turn ('This felt wrong').
     """
-    return JsonResponse({'message': 'Flag submitted successfully.'}, status=201)
+    data=json.loads(request.body)
+    turn_id = data.get('turn_id')
+    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool):
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'turn_id must be a valid integer.'
+            }
+        }, status=400)
+    try:
+        turn = Turn.objects.get(pk=turn_id, attempt__learner=request.user)
+    except Turn.DoesNotExist:
+        return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Turn not found or access denied.'}}, status=404)
+
+    if hasattr(turn, 'flag'):
+        return JsonResponse({'error': {'code': 'CONFLICT', 'message': 'This turn has already been flagged.'}}, status=409)
+
+    flag = Flag.objects.create(
+        turn=turn,
+        status='Unresolved'
+    )
+
+    return JsonResponse({
+        'message': 'Flag submitted successfully.',
+        'flag': {
+            'id': flag.id,
+            'turn_id': turn.id,
+            'status': flag.status,
+            'flagged_at': flag.flagged_at.isoformat()
+        }
+    }, status=201)
 
 
 @require_GET
@@ -517,7 +547,18 @@ def list_flags(request):
     GET /api/flag/list/
     Reviewer fetches list of Unresolved flagged turns (US-13 AC1).
     """
-    return JsonResponse({'flags': []})
+    unresolved_flags = Flag.objects.filter(status='Unresolved').select_related('turn', 'turn__attempt__lesson')
+    flag_list = []
+    for f in unresolved_flags:
+        flag_list.append({
+            'id': f.id,
+            'turn_id': f.turn.id,
+            'scenario': f.turn.attempt.lesson.scenario,
+            'learner_text': f.turn.learner_text,
+            'ai_reply': f.turn.ai_reply,
+            'flagged_at': f.flagged_at.isoformat(),
+        })
+    return JsonResponse({'flags': flag_list})
 
 
 @require_POST
@@ -527,7 +568,52 @@ def review_flag(request):
     POST /api/flag/review/
     Reviewer marks a Flag as 'Acceptable' or 'Incorrect' (US-13 AC2).
     """
-    return JsonResponse({'message': 'Flag reviewed successfully.'})
+    data = body(request)
+    flag_id = data.get('flag_id')
+    new_status = data.get('status')
+
+    if new_status not in ['Acceptable', 'Incorrect']:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Status must be Acceptable or Incorrect.'}}, status=400)
+
+    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool):
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'flag_id must be a valid integer.'
+            }
+        }, status=400)
+    
+    try: # check status of the flag before attempting to retrieve it
+        flag = Flag.objects.get(pk=flag_id, status='Unresolved')
+    except Flag.DoesNotExist:
+        if Flag.objects.filter(pk=flag_id).exists():
+            return JsonResponse({
+                'error': {
+                    'code': 'CONFLICT',
+                    'message': 'This flag has already been reviewed and cannot be overwritten.'
+                }
+            }, status=409)
+        return JsonResponse({
+            'error': {
+                'code': 'NOT_FOUND',
+                'message': 'Unresolved flag record not found.'
+            }
+        }, status=404)
+
+    flag.status = new_status
+    flag.reviewer = request.user
+    flag.reviewed_at = timezone.now()
+    flag.save()
+
+    return JsonResponse({
+        'message': 'Flag reviewed successfully.',
+        'flag': {
+            'id': flag.id,
+            'status': flag.status,
+            'reviewer': request.user.username,
+            'reviewed_at': flag.reviewed_at.isoformat()
+        }
+    })
 
 
 @require_GET
