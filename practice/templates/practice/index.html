@@ -5,12 +5,22 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Speako · Restaurant practice</title>
   <link rel="stylesheet" href="{% static 'practice/app.css' %}">
+  <script defer src="{% static 'practice/protocol.js' %}"></script>
   <script defer src="{% static 'practice/app.js' %}"></script>
 </head>
 <body>
   <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local prototype · v0.1.1</span></header>
   <main>
     <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's order something.</h1><p class="subtitle">Practice a simple restaurant conversation, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
+    <section class="setup" aria-label="Account">
+      <p id="account-name">Sign in to practice</p>
+      <form id="sign-in-form">
+        <label>Username <input id="username" autocomplete="username" required></label>
+        <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="secondary">Sign in</button>
+      </form>
+      <button id="sign-out" class="secondary" hidden>Sign out</button>
+    </section>
     <div id="setup" class="setup" role="status" hidden></div>
     <div class="workspace">
       <aside class="lesson-card">
@@ -44,7 +54,7 @@
       <p id="billing-note" class="quiet">Actual provider spend must be checked in Google AI Studio. Free-tier mode never enables billing.</p>
       <details><summary>Measurement history</summary><div class="table-scroll"><table><thead><tr><th>Step</th><th>Actual</th><th>Suggested target</th><th>Result</th></tr></thead><tbody id="measurements"></tbody></table></div></details>
     </section>
-    <footer>One fixed scenario · No login in this milestone · Summaries use this session's confirmed answers</footer>
+    <footer>One fixed scenario · Signed-in learner practice · Summaries use this session's confirmed answers</footer>
   </main>
 </body>
 </html>
