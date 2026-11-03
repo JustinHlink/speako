@@ -1,0 +1,12 @@
+name: speako
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10  # Supports Python 3.10 to 3.13
+  - pip
+  - pip:
+      - Django==5.2.18
+      - asgiref==3.12.1
+      - sqlparse==0.6.0
+      - tzdata==2026.5
