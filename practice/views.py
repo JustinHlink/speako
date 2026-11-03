@@ -39,6 +39,7 @@ def attempt_snapshot(attempt):
         'turns': [turn_snapshot(turn) for turn in turns],
         'pending': {'id': attempt.pending_id, 'text': attempt.pending_transcript} if attempt.pending_id else None,
         'summary': saved_summary(attempt),
+        'progress': lesson_progress(attempt.learner, attempt.lesson),
     }
 
 
@@ -51,6 +52,22 @@ def saved_summary(attempt):
     return {'used': summary.words_used, 'unused': summary.words_not_used,
             'corrections': [{'original': c.turn.learner_text, 'explanation': c.explanation,
                              'example': c.corrected_example} for c in corrections]}
+
+
+def save_summary(attempt):
+    texts = attempt.turns.values_list('learner_text', flat=True)
+    targets = attempt.lesson.words.order_by('id').values_list('word', flat=True)
+    summary = make_summary(texts, targets)
+    LessonSummary.objects.create(attempt=attempt, words_used=summary['used'], words_not_used=summary['unused'])
+
+
+def lesson_progress(learner, lesson):
+    """Map status derived from attempts (DR-03): a completed lesson stays completed during a retake."""
+    attempts = LessonAttempt.objects.filter(learner=learner, lesson=lesson)
+    completed = attempts.filter(status='Completed').order_by('-ended_at').first()
+    if completed:
+        return {'status': 'Completed', 'last_completed_attempt_id': str(completed.pk)}
+    return {'status': 'In progress' if attempts.exists() else 'Not started', 'last_completed_attempt_id': None}
 
 
 def turn_snapshot(turn):
@@ -278,6 +295,7 @@ def status(request):
         'targets': TARGETS, 'api_ready': ok, 'setup_message': message,
         'user': {'username': request.user.username, 'role': request.user.role} if request.user.is_authenticated else None,
         'usage': providers.usage(), 'attempt': attempt_snapshot(attempt) if attempt else None,
+        'progress': lesson_progress(request.user, lesson) if lesson and request.user.is_authenticated else None,
     })
 
 OPENING_LINE = 'Hello! Welcome. What would you like today?'
@@ -434,12 +452,20 @@ def reply_to_pending(attempt, pending_id):
         attempt.pending_transcript = ''
         attempt.pending_id = ''
         fields = ['pending_transcript', 'pending_id']
+        summary_ms = None
         if turn_number == lesson.turn_limit:
+            summary_start = time.perf_counter()
             attempt.status = 'Completed'
             attempt.ended_at = timezone.now()
             fields += ['status', 'ended_at']
+            # Completion and summary are saved in one write, before the screen data returns (NFR 4).
+            save_summary(attempt)
+            summary_ms = (time.perf_counter() - summary_start) * 1000
         attempt.save(update_fields=fields)
-    return JsonResponse({'attempt': attempt_snapshot(attempt)})
+    response = {'attempt': attempt_snapshot(attempt)}
+    if summary_ms is not None:
+        response['summary_ms'] = summary_ms
+    return JsonResponse(response)
 
 
 @require_POST
@@ -460,6 +486,20 @@ def exit_lesson(request):
     return JsonResponse({'attempt': attempt_snapshot(attempt)})
 
 
+@require_GET
+@require_role(['Learner'])
+def get_summary(request, attempt_id):
+    """
+    GET /api/attempts/{id}/summary/
+    Reopen the saved summary of one of this learner's completed attempts (US-18 AC4).
+    """
+    attempt = find_attempt(request, attempt_id)
+    summary = saved_summary(attempt) if attempt else None
+    if summary is None:
+        return error(404, 'NOT_FOUND', 'Lesson summary not found.')
+    return JsonResponse({'summary': summary})
+
+
 @require_POST
 @require_role(['Learner'])
 def submit_flag(request):
@@ -467,9 +507,9 @@ def submit_flag(request):
     POST /api/flag/submit/
     Learner flags an inappropriate or incorrect Turn ('This felt wrong').
     """
-    data=json.loads(request.body)
+    data = body(request)
     turn_id = data.get('turn_id')
-    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool):
+    if turn_id is None or not isinstance(turn_id, int) or isinstance(turn_id, bool) or not 0 < turn_id <= 9223372036854775807:
         return JsonResponse({
             'error': {
                 'code': 'INVALID_INPUT',
@@ -481,13 +521,9 @@ def submit_flag(request):
     except Turn.DoesNotExist:
         return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Turn not found or access denied.'}}, status=404)
 
-    if hasattr(turn, 'flag'):
+    flag, created = Flag.objects.get_or_create(turn=turn, defaults={'status': 'Unresolved'})
+    if not created:
         return JsonResponse({'error': {'code': 'CONFLICT', 'message': 'This turn has already been flagged.'}}, status=409)
-
-    flag = Flag.objects.create(
-        turn=turn,
-        status='Unresolved'
-    )
 
     return JsonResponse({
         'message': 'Flag submitted successfully.',
@@ -535,7 +571,7 @@ def review_flag(request):
     if new_status not in ['Acceptable', 'Incorrect']:
         return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Status must be Acceptable or Incorrect.'}}, status=400)
 
-    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool):
+    if flag_id is None or not isinstance(flag_id, int) or isinstance(flag_id, bool) or not 0 < flag_id <= 9223372036854775807:
         return JsonResponse({
             'error': {
                 'code': 'INVALID_INPUT',
@@ -543,27 +579,14 @@ def review_flag(request):
             }
         }, status=400)
     
-    try: # check status of the flag before attempting to retrieve it
-        flag = Flag.objects.get(pk=flag_id, status='Unresolved')
-    except Flag.DoesNotExist:
+    reviewed_at = timezone.now()
+    changed = Flag.objects.filter(pk=flag_id, status='Unresolved').update(
+        status=new_status, reviewer=request.user, reviewed_at=reviewed_at)
+    if not changed:
         if Flag.objects.filter(pk=flag_id).exists():
-            return JsonResponse({
-                'error': {
-                    'code': 'CONFLICT',
-                    'message': 'This flag has already been reviewed and cannot be overwritten.'
-                }
-            }, status=409)
-        return JsonResponse({
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unresolved flag record not found.'
-            }
-        }, status=404)
-
-    flag.status = new_status
-    flag.reviewer = request.user
-    flag.reviewed_at = timezone.now()
-    flag.save()
+            return error(409, 'CONFLICT', 'This flag has already been reviewed and cannot be overwritten.')
+        return error(404, 'NOT_FOUND', 'Unresolved flag record not found.')
+    flag = Flag.objects.get(pk=flag_id)
 
     return JsonResponse({
         'message': 'Flag reviewed successfully.',

@@ -8,7 +8,6 @@ from django.utils import timezone
 from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord, Turn, Flag
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
-from datetime import timezone
 
 @override_settings(GEMINI_API_KEY='test-only-not-a-real-key', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite', PROJECT_BUDGET_USD=10, RECORDED_EXTERNAL_SPEND_USD=0)
 class BudgetTests(TestCase):
@@ -331,8 +330,8 @@ class AuthenticationTests(TestCase):
 
 class SummaryTests(TestCase):
     def test_only_confirmed_learner_words_and_all_corrections(self):
-        summary = make_summary([{'learner': 'chicken', 'reply': 'water', 'correction': {'explanation': 'Please use a polite request.', 'example': 'I would like chicken please.'}}])
+        summary = make_summary(['chicken'], ['chicken', 'water'])
         self.assertEqual(summary['used'], ['chicken'])
         self.assertIn('water', summary['unused'])
-        self.assertEqual(len(summary['corrections']), 1)
+        self.assertNotIn('corrections', summary)  # Stored corrections are joined by saved_summary().
 
