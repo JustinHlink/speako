@@ -2,8 +2,10 @@
 import io
 import json
 from unittest.mock import patch
-from django.test import TestCase, override_settings
-from .models import ApiUsage
+from django.test import TestCase, Client, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from .models import ApiUsage, User
+from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
 @override_settings(GEMINI_API_KEY='test-only-not-a-real-key', GEMINI_FREE_TIER_CONFIRMED=True, GEMINI_MODEL='gemini-3.1-flash-lite', PROJECT_BUDGET_USD=10, RECORDED_EXTERNAL_SPEND_USD=0)
@@ -49,3 +51,136 @@ class BudgetTests(TestCase):
         with self.assertRaises(ProviderError):
             generate('conversation', [], '', {})
         network.assert_not_called()
+
+class AuthenticationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.password = 'secure_password123'
+        self.learner = User.objects.create_user(
+            username='test_learner',
+            password=self.password,
+            role='Learner'
+        )
+
+    def test_login_success(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner', 'password': self.password}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('user', data)
+        self.assertEqual(data['user']['username'], 'test_learner')
+        self.assertEqual(data['user']['role'], 'Learner')
+
+    def test_login_invalid_credentials_returns_401(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner', 'password': 'wrong_password'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['error']['code'], 'UNAUTHORIZED')
+
+    def test_login_missing_fields_returns_400(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({'username': 'test_learner'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_logout_success(self):
+        self.client.force_login(self.learner)
+        response = self.client.post('/api/auth/logout/')
+        self.assertEqual(response.status_code, 204)
+
+    def test_logout_unauthenticated_returns_401(self):
+        response = self.client.post('/api/auth/logout/')
+        self.assertEqual(response.status_code, 401)
+
+    def test_register_success(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'new_student', 'password': 'password123', 'role': 'Learner'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(username='new_student').exists())
+        self.assertEqual(User.objects.get(username='new_student').role, 'Learner')
+
+    def test_register_duplicate_username_returns_409(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'test_learner', 'password': 'password123'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_register_ignores_requested_role_and_forces_learner(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({'username': 'hacker_user', 'password': 'password123', 'role': 'Curator'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        
+        user = User.objects.get(username='hacker_user')
+        self.assertEqual(user.role, 'Learner')
+        self.assertNotEqual(user.role, 'Curator')
+
+    def test_login_and_register_with_whitespace_password(self):
+        spaced_password = "  secret password 123  "
+        
+        reg_response = self.client.post(
+            '/api/auth/register/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': spaced_password
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(reg_response.status_code, 201)
+
+        self.client.post('/api/auth/logout/')
+
+        wrong_login_response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': 'secret password 123'
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(wrong_login_response.status_code, 401)
+
+        correct_login_response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'whitespace_user',
+                'password': spaced_password
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(correct_login_response.status_code, 200)
+
+    def test_login_non_string_password_returns_400(self):
+        response = self.client.post(
+            '/api/auth/login/',
+            json.dumps({
+                'username': 'test_learner',
+                'password': 12345
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class SummaryTests(TestCase):
+    def test_only_confirmed_learner_words_and_all_corrections(self):
+        summary = make_summary([{'learner': 'chicken', 'reply': 'water', 'correction': {'explanation': 'Please use a polite request.', 'example': 'I would like chicken please.'}}])
+        self.assertEqual(summary['used'], ['chicken'])
+        self.assertIn('water', summary['unused'])
+        self.assertEqual(len(summary['corrections']), 1)
+
