@@ -25,6 +25,10 @@ def map_status(learner, lesson):
 
 
 def latest_completed_attempt(learner, lesson):
-    """The attempt whose summary the learning map reopens (US-18 AC4)."""
-    return (LessonAttempt.objects.filter(learner=learner, lesson=lesson, status=COMPLETED)
+    """The attempt whose summary the learning map reopens (US-18 AC4).
+
+    Attempts without ended_at are skipped, since some databases sort NULL first.
+    """
+    return (LessonAttempt.objects.filter(learner=learner, lesson=lesson, status=COMPLETED,
+                                         ended_at__isnull=False)
             .order_by('-ended_at').first())
