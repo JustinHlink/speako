@@ -4,7 +4,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import ApiUsage, User
+from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -52,6 +52,78 @@ class BudgetTests(TestCase):
             generate('conversation', [], '', {})
         network.assert_not_called()
 
+class LearningMapTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.learner = User.objects.create_user(username='map_student', password='password', role='Learner')
+        
+        self.lesson1 = Lesson.objects.create(scenario='Restaurant', grammar_goal='Polite requests', turn_limit=5, status='Published')
+        LessonWord.objects.create(lesson=self.lesson1, word='water')
+        LessonWord.objects.create(lesson=self.lesson1, word='menu')
+        
+        self.lesson2 = Lesson.objects.create(scenario='Customs', grammar_goal='Short answers', turn_limit=5, status='Published')
+        
+        LessonAttempt.objects.create(learner=self.learner, lesson=self.lesson1, status='Completed')
+
+    def test_list_lessons_status_computation(self):
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 200)
+        
+        lessons = response.json()['lessons']
+        self.assertEqual(len(lessons), 2)
+        
+        l1_data = next(l for l in lessons if l['id'] == self.lesson1.id)
+        self.assertEqual(l1_data['status_on_map'], 'Completed')
+        
+        l2_data = next(l for l in lessons if l['id'] == self.lesson2.id)
+        self.assertEqual(l2_data['status_on_map'], 'Not started')
+
+    def test_get_lesson_detail_success(self):
+        self.client.force_login(self.learner)
+        response = self.client.get(f'/api/lessons/{self.lesson1.id}/')
+        self.assertEqual(response.status_code, 200)
+        
+        lesson_data = response.json()['lesson']
+        self.assertEqual(lesson_data['scenario'], 'Restaurant')
+        self.assertIn('water', lesson_data['target_words'])
+        self.assertIsNotNone(lesson_data['last_completed_attempt_id'])
+
+    def test_list_lessons_in_progress_status(self):
+        LessonAttempt.objects.create(
+            learner=self.learner,
+            lesson=self.lesson2,
+            status='In progress'
+        )
+
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 200)
+
+        lessons = response.json()['lessons']
+        l2_data = next(l for l in lessons if l['id'] == self.lesson2.id)
+        
+        self.assertEqual(l2_data['status_on_map'], 'In progress')
+
+    def test_list_lessons_exited_status_returns_in_progress(self):
+        LessonAttempt.objects.create(
+            learner=self.learner,
+            lesson=self.lesson2,
+            status='Exited'
+        )
+
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 200)
+
+        lessons = response.json()['lessons']
+        l2_data = next(l for l in lessons if l['id'] == self.lesson2.id)
+        
+        self.assertEqual(l2_data['status_on_map'], 'In progress')
+
+    def test_list_lessons_unauthenticated_returns_401(self):
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 401)
 class AuthenticationTests(TestCase):
     def setUp(self):
         self.client = Client()

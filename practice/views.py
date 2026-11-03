@@ -206,7 +206,35 @@ def list_lessons(request):
     L01: GET /api/lessons/
     Return all Published lessons with map status computed per learner (DR-03).
     """
-    return JsonResponse({'lessons': []})
+    published_lessons = Lesson.objects.filter(status='Published').order_by('id')
+    
+    user_attempts = LessonAttempt.objects.filter(learner=request.user)
+    
+    completed_lesson_ids = set(
+        user_attempts.filter(status='Completed').values_list('lesson_id', flat=True)
+    )
+    in_progress_lesson_ids = set(
+        user_attempts.filter(status__in=['In progress', 'Exited']).values_list('lesson_id', flat=True)
+    )
+
+    lessons_data = []
+    for l in published_lessons:
+        if l.id in completed_lesson_ids:
+            status_on_map = 'Completed'
+        elif l.id in in_progress_lesson_ids:
+            status_on_map = 'In progress'
+        else:
+            status_on_map = 'Not started'
+
+        lessons_data.append({
+            'id': l.id,
+            'scenario': l.scenario,
+            'grammar_goal': l.grammar_goal,
+            'turn_limit': l.turn_limit,
+            'status_on_map': status_on_map
+        })
+
+    return JsonResponse({'lessons': lessons_data})
 
 
 @require_GET
@@ -216,7 +244,29 @@ def get_lesson_detail(request, lesson_id):
     L02: GET /api/lessons/{id}/
     Return available lesson details and latest completed attempt ID.
     """
-    return JsonResponse({'lesson': {}})
+    try:
+        lesson = Lesson.objects.get(pk=lesson_id, status='Published')
+    except Lesson.DoesNotExist:
+        return JsonResponse({'error': {'code': 'NOT_FOUND', 'message': 'Published lesson not found.'}}, status=404)
+
+    target_words = list(lesson.words.values_list('word', flat=True))
+
+    last_completed_attempt = LessonAttempt.objects.filter(
+        learner=request.user,
+        lesson=lesson,
+        status='Completed'
+    ).order_by('-ended_at').first()
+
+    return JsonResponse({
+        'lesson': {
+            'id': lesson.id,
+            'scenario': lesson.scenario,
+            'grammar_goal': lesson.grammar_goal,
+            'turn_limit': lesson.turn_limit,
+            'target_words': target_words,
+            'last_completed_attempt_id': str(last_completed_attempt.id) if last_completed_attempt else None
+        }
+    })
 
 
 @require_GET
