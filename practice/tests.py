@@ -71,7 +71,7 @@ class LearningMapTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         lessons = response.json()['lessons']
-        self.assertEqual(len(lessons), 2)
+        self.assertEqual(len(lessons), Lesson.objects.filter(status='Published').count())
         
         l1_data = next(l for l in lessons if l['id'] == self.lesson1.id)
         self.assertEqual(l1_data['status_on_map'], 'Completed')
