@@ -70,6 +70,7 @@ async function loadPage({attempt = null, permission = 'granted', getUserMedia} =
   browser.window = browser;
   vm.createContext(browser);
   vm.runInContext(source('protocol.js'), browser);
+  vm.runInContext(source('speech.js'), browser);
   vm.runInContext(source('app.js'), browser);
   page.el = id => browser.document.getElementById(id);
   page.settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise(setImmediate); };
