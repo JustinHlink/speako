@@ -1,5 +1,9 @@
 # Speako
 
+**For instructors:** start with the [step-by-step demo guide](docs/teacher-run.md): download, Windows/macOS setup, API configuration, login credentials and the complete walkthrough.
+
+**Local demo login:** `learner1` / `SpeakoDemo2026!` after running the seed command below. Use `learner2` with the same password for account isolation.
+
 Speako is a web app for beginner English learners. A learner signs in, starts a lesson and holds a short spoken conversation with an AI partner. The partner stays inside the lesson's word list and corrects important mistakes, and the lesson ends with a summary of the words used and the corrections made.
 
 The app runs locally with Django and SQLite. Gemini turns the learner's speech into text and writes the partner's replies. The browser reads the replies aloud.
@@ -56,27 +60,27 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py seed_demo_users --password "YOUR_DEMO_PASSWORD"
+.\.venv\Scripts\python.exe manage.py seed_demo_users --password "SpeakoDemo2026!"
 ```
 
 macOS or Linux:
 
 ```bash
 .venv/bin/python manage.py migrate
-.venv/bin/python manage.py seed_demo_users --password "YOUR_DEMO_PASSWORD"
+.venv/bin/python manage.py seed_demo_users --password "SpeakoDemo2026!"
 ```
 
 - `migrate` creates the tables and the restaurant lesson with its word lists.
 - `seed_demo_users` creates the demo accounts. The demo uses pre-created accounts; the registration API always creates Learners.
 
-| Username | Role |
-|---|---|
-| `learner1` | Learner |
-| `learner2` | Learner |
-| `curator1` | Curator |
-| `reviewer1` | Reviewer |
+| Username | Password after the seed command above | Role |
+|---|---|---|
+| `learner1` | `SpeakoDemo2026!` | Learner |
+| `learner2` | `SpeakoDemo2026!` | Learner |
+| `curator1` | `SpeakoDemo2026!` | Curator |
+| `reviewer1` | `SpeakoDemo2026!` | Reviewer |
 
-All four accounts use the password you choose (8 or more characters). You can also set `SPEAKO_DEMO_PASSWORD` instead of `--password`. Running the command again resets the passwords and roles and never makes duplicate accounts.
+The commands above set all four local demo passwords to `SpeakoDemo2026!`. If you choose a different password in the seed command, use it instead (8 or more characters). These are local demo credentials, not GitHub or API credentials. You can also set `SPEAKO_DEMO_PASSWORD` instead of `--password`. Running the command again resets the passwords and roles and never makes duplicate accounts.
 
 ## 4. Run
 
@@ -132,7 +136,7 @@ Gemini is used only for speech-to-text and for the partner's replies. The projec
 
 ## Submission and demo version
 
-For assessment, use the fixed tag `submission-sprint3-2026-11-04` after it is
+For assessment, use the fixed tag `submission-sprint3-2026-11-04-r2` after it is
 published, or the exact commit linked in the submission document. New work goes
 through feature PRs and develop; tested submission changes are merged into main.
 Do not move an existing submission tag. A new checkout needs dependencies,
