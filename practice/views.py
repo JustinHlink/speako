@@ -115,7 +115,7 @@ def list_lessons(request):
         user_attempts.filter(status='Completed').values_list('lesson_id', flat=True)
     )
     in_progress_lesson_ids = set(
-        user_attempts.filter(status='In progress').values_list('lesson_id', flat=True)
+        user_attempts.filter(status__in=['In progress', 'Exited']).values_list('lesson_id', flat=True)
     )
 
     lessons_data = []

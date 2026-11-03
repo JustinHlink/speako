@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import *
+from .models import ApiUsage, LessonAttempt, Lesson, User, LessonWord
 from .lesson import LESSON, make_summary
 from .gemini import generate, ProviderError
 
@@ -217,6 +217,26 @@ class LearningMapTests(TestCase):
         l2_data = next(l for l in lessons if l['id'] == self.lesson2.id)
         
         self.assertEqual(l2_data['status_on_map'], 'In progress')
+
+    def test_list_lessons_exited_status_returns_in_progress(self):
+        LessonAttempt.objects.create(
+            learner=self.learner,
+            lesson=self.lesson2,
+            status='Exited'
+        )
+
+        self.client.force_login(self.learner)
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 200)
+
+        lessons = response.json()['lessons']
+        l2_data = next(l for l in lessons if l['id'] == self.lesson2.id)
+        
+        self.assertEqual(l2_data['status_on_map'], 'In progress')
+
+    def test_list_lessons_unauthenticated_returns_401(self):
+        response = self.client.get('/api/lessons/')
+        self.assertEqual(response.status_code, 401)
 
 
 class SummaryTests(TestCase):
