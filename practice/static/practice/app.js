@@ -54,7 +54,7 @@ function controls() {
   $('stop').disabled=!recording;
   $('confirm').disabled=!pending || busy || speaking;
   $('discard').disabled=!pending || busy || speaking;
-  $('repeat').disabled=!lastReply || busy || speaking || recording;
+  $('repeat').disabled=!SpeakoSpeech.canRepeat(lastReply, busy, speaking, recording);
   $('exit').disabled=!active || busy || speaking || recording;
   $('lesson-progress').hidden=!progress;$('lesson-progress').textContent=progress?.status || '';
   const lastCompleted=progress?.last_completed_attempt_id;$('view-summary').hidden=!lastCompleted || session?.id===lastCompleted;$('view-summary').disabled=busy || speaking || recording;
@@ -137,7 +137,7 @@ $('confirm').onclick=async()=>{
     busy=false;await play(lastReply,1,playbackMs=>measure('system_total',recognitionWait+replyWait+playbackMs));
   }catch(e){measure('ai_reply',performance.now()-begun,'failed',e.serverMs);error(e.message);state('AI response failed — retry Continue');}finally{busy=false;controls();}
 };
-$('repeat').onclick=()=>{error();play(lastReply,.75);};
+$('repeat').onclick=()=>{error();SpeakoSpeech.repeatSlower(lastReply, window.speechSynthesis, play);};
 $('exit').onclick=async()=>{if(!window.confirm('Exit this unfinished lesson? No summary will be created.'))return;error();busy=true;controls();try{const result=await request('/api/exit/',{attempt_id:session.id});session=SpeakoProtocol.attempt(result.attempt);render();state('Lesson exited. No summary was created.');}catch(e){error(e.message);}finally{busy=false;controls();}};
 $('export').onclick=async()=>{try{const response=await fetch('/api/metrics/');if(!response.ok)throw new Error('Unable to load server measurements.');const ledger=await response.json();const blob=new Blob([JSON.stringify({prototype:'v0.1.2',exported_at:new Date().toISOString(),note:'Suggested timing targets; human time excluded from system wait. Local budget guard is not a provider invoice.',targets_ms:targets,browser_measurements:measurements,...ledger},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`speako-test-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch(e){error(e.message);}};
 $('sign-in-form').onsubmit=async event=>{event.preventDefault();error();try{await request('/api/auth/login/',{username:$('username').value,password:$('password').value});$('password').value='';location.reload();}catch(e){error(e.message);}};
