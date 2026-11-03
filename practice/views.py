@@ -102,24 +102,30 @@ def api_login(request):
     Inputs: username, password -> Account role & new authenticated session.
     """
     data = body(request)
-    username = data.get('username')
+    username = data.get('username', '').strip()
     password = data.get('password')
+
+    if not isinstance(username, str) or not username.strip():
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username must be a non-empty string.'}}, status=400)
     
-    if not username or not password:
-        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Username and password required.'}}, status=400)
-    
+    if not isinstance(password, str) or not password:
+        return JsonResponse({'error': {'code': 'INVALID_INPUT', 'message': 'Password must be a non-empty string.'}}, status=400)
+
+    username = username.strip()
+
     user = authenticate(request, username=username, password=password)
     if user is None:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid credentials.'}}, status=401)
-    
+        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'Invalid username or password.'}}, status=401)
+
     login(request, user)
+
     return JsonResponse({
         'user': {
             'id': user.id,
             'username': user.username,
             'role': user.role
         }
-    })
+    }, status=200)
 
 
 @require_POST
@@ -129,10 +135,69 @@ def api_logout(request):
     Clear authenticated session and private browser state.
     """
     if not request.user.is_authenticated:
-        return JsonResponse({'error': {'code': 'UNAUTHORIZED', 'message': 'No active session.'}}, status=401)
-    
+        return JsonResponse({
+            'error': {
+                'code': 'UNAUTHORIZED',
+                'message': 'No active session found.'
+            }
+        }, status=401)
+
     logout(request)
+
     return JsonResponse({}, status=204)
+
+@require_POST
+def api_register(request):
+    """
+    A03: POST /api/auth/register/
+    Register a new user with the specified role (default is Learner).
+    """
+    data = body(request)
+    username = data.get('username', '').strip()
+    password = data.get('password')
+    role = data.get('role', 'Learner').strip()
+
+    if not username or not password:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_INPUT',
+                'message': 'Username and password are required.'
+            }
+        }, status=400)
+
+    allowed_roles = [choice[0] for choice in User.ROLE_CHOICES]
+    if role not in allowed_roles:
+        return JsonResponse({
+            'error': {
+                'code': 'INVALID_ROLE',
+                'message': f'Role must be one of {allowed_roles}.'
+            }
+        }, status=400)
+
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({
+            'error': {
+                'code': 'CONFLICT',
+                'message': 'Username already exists.'
+            }
+        }, status=409)
+
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        role='Learner'  # Always hardcoded to Learner
+    )
+
+    login(request, user)
+
+    return JsonResponse({
+        'message': 'User created successfully.',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role
+        }
+    }, status=201)
 
 @require_GET
 @require_role(['Learner'])
