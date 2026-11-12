@@ -1,0 +1,13 @@
+{% load static %}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speako · Review queue</title><link rel="stylesheet" href="{% static 'practice/app.css' %}">
+<script defer src="{% static 'practice/reviewer.js' %}"></script></head>
+<body><header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">Conversation review</span></header>
+<main><div class="intro"><div><p class="eyebrow">REVIEWER</p><h1>Flagged responses</h1><p class="subtitle">Review the lesson context before recording a decision.</p></div><button id="review-sign-out" class="secondary">Sign out</button></div>
+<p>Signed in as {{ user.username }}</p>
+<div class="row"><h2>Unresolved queue</h2><button id="review-refresh" class="secondary">Refresh queue</button></div>
+<p id="review-status" role="status" aria-live="polite"></p>
+<div id="review-error" class="setup" role="alert" hidden></div>
+<section id="review-queue" aria-label="Unresolved flagged responses"></section>
+</main></body></html>
