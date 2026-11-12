@@ -160,9 +160,12 @@ budget guard. Invalid candidates never advance a turn; a second rejection or
 provider failure keeps the transcript for retry. There is no unlimited retry
 or paid fallback. See docs/reply-recovery.md.
 
-This candidate contains the restaurant lesson. Other scenarios are not claimed
-as completed by this demo. Review and curriculum interfaces without a completed
-UI should not be listed in the learner demo script as working pages.
+The learning map includes Ordering at a Restaurant and Passing Customs. Run
+`python manage.py migrate` to add the customs lesson and its vocabulary. Each
+lesson has its own role, opening, context, word list, progress, and summary.
+Learners can flag a saved AI reply using Flag this reply; a successful submission
+persists across reloads and does not advance the conversation.
+See [Sprint 4 customs and flag checks](docs/sprint4-customs-flag.md).
 
 ## Provider errors and recovery
 
