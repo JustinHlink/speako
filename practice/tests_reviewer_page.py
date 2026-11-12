@@ -50,3 +50,19 @@ class ReviewerPageTests(TestCase):
     def test_reviewer_link_visible_only_to_reviewer(self):
         self.client.force_login(self.learner);self.assertNotContains(self.client.get('/'),'Open review queue')
         self.client.force_login(self.reviewer);self.assertContains(self.client.get('/'),'Open review queue')
+
+    def test_learner_flag_to_reviewer_decision_end_to_end(self):
+        turn=Turn.objects.create(attempt=self.attempt,turn_number=3,learner_text='Yes please.',ai_reply='Thank you.',pending_id='queue-end-to-end')
+        self.client.force_login(self.learner)
+        created=self.client.post('/api/flag/submit/',{'turn_id':turn.pk},content_type='application/json')
+        self.assertEqual(created.status_code,201)
+        flag_id=created.json()['flag']['id']
+        self.client.force_login(self.reviewer)
+        items=self.client.get('/api/flag/list/').json()['flags']
+        self.assertIn(flag_id,[item['id'] for item in items])
+        result=self.client.post('/api/flag/review/',{'flag_id':flag_id,'status':'Acceptable'},content_type='application/json')
+        self.assertEqual(result.status_code,200)
+        self.assertNotIn(flag_id,[item['id'] for item in self.client.get('/api/flag/list/').json()['flags']])
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.post('/api/flag/submit/',{'turn_id':turn.pk},content_type='application/json').status_code,409)
+        self.attempt.refresh_from_db();self.assertEqual(self.attempt.status,'In progress')

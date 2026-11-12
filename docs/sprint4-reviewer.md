@@ -28,7 +28,7 @@ do not automatically rewrite AI replies or change lesson content.
 
 ## Tests
 
-- `python manage.py test` (119 backend tests)
+- `python manage.py test` (120 backend tests)
 - Run all `practice/tests*.cjs` scripts with Node, including tests_reviewer_page.cjs.
 - Page/API role denial, CSRF, saved decisions, duplicate review conflicts,
   unresolved filtering, context, network failures, and safe text rendering.
