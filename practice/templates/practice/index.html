@@ -3,17 +3,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Speako · Restaurant practice</title>
+  <title>Speako · English practice</title>
   <link rel="stylesheet" href="{% static 'practice/app.css' %}">
   <script defer src="{% static 'practice/protocol.js' %}"></script>
   <script defer src="{% static 'practice/speech.js' %}"></script>
   <script defer src="{% static 'practice/map.js' %}"></script>
+  <script defer src="{% static 'practice/flags.js' %}"></script>
   <script defer src="{% static 'practice/app.js' %}"></script>
 </head>
 <body>
   <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local practice</span></header>
   <main>
-    <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's order something.</h1><p class="subtitle">Practice a simple restaurant conversation, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
+    <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's practice a conversation.</h1><p class="subtitle">Choose a lesson and practice English, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
     <section class="setup" aria-label="Account">
       <p id="account-name">Sign in to practice</p>
       <form id="sign-in-form">
@@ -30,7 +31,7 @@
         <div class="restaurant-icon" aria-hidden="true">☕</div><p class="eyebrow">YOUR SCENARIO</p><h2 id="lesson-title">Ordering at a Restaurant</h2>
         <p id="goal">Order food and a drink politely, then ask for the bill.</p>
         <div class="lesson-meta"><span>Beginner English</span><span id="lesson-turn-limit">5 exchanges</span><span id="lesson-progress" hidden></span></div>
-        <h3>Today's menu</h3><ul class="menu"><li>Chicken with rice</li><li>Soup</li><li>Water</li><li>Tea</li></ul>
+        <h3 id="context-title">Today's menu</h3><ul id="context-items" class="menu"><li>Chicken with rice</li><li>Soup</li><li>Water</li><li>Tea</li></ul>
         <h3>Target words</h3><div id="vocabulary" class="word-list"></div>
         <p id="lesson-grammar" class="grammar">Try: “I would like…” or “Can I have…?”</p>
         <button id="start" class="primary">Start practice <span aria-hidden="true">→</span></button>
@@ -39,7 +40,7 @@
       </aside>
       <section class="conversation-card" aria-labelledby="conversation-heading">
         <div class="conversation-top"><div><p class="eyebrow">YOUR AI PARTNER</p><h2 id="conversation-heading">The restaurant waiter</h2></div><span id="progress" class="progress">Ready to begin</span></div>
-        <div id="messages" class="messages" aria-live="polite"><div class="empty"><span class="empty-symbol" aria-hidden="true">“</span><h3>A little practice goes a long way.</h3><p>Start the lesson. Listen to your waiter, then record your reply.</p></div></div>
+        <div id="messages" class="messages" aria-live="polite"><div class="empty"><span class="empty-symbol" aria-hidden="true">“</span><h3>A little practice goes a long way.</h3><p>Start the lesson. Listen to your conversation partner, then record your reply.</p></div></div>
         <div class="reply-tools"><button id="repeat" class="secondary" disabled>Repeat slower</button><div id="time-playback" class="timing">Playback start · — / target ≤ 1 s</div></div>
         <div id="summary" class="summary" hidden></div>
         <div id="transcript" class="transcript" hidden><div class="row"><h3>Did we hear you correctly?</h3></div><p id="transcript-text"></p><div class="row"><div><button id="confirm" class="primary">Continue</button><button id="discard" class="secondary">Try again</button></div><div id="time-confirmation" class="timing">Your review time · — (no limit)</div></div></div>
@@ -58,7 +59,7 @@
       <p id="billing-note" class="quiet">Actual provider spend must be checked in Google AI Studio. Free-tier mode never enables billing.</p>
       <details><summary>Measurement history</summary><div class="table-scroll"><table><thead><tr><th>Step</th><th>Actual</th><th>Suggested target</th><th>Result</th></tr></thead><tbody id="measurements"></tbody></table></div></details>
     </section>
-    <footer>One fixed scenario · Signed-in learner practice · Summaries use this session's confirmed answers</footer>
+    <footer>Two guided scenarios · Signed-in learner practice · Summaries use this session's confirmed answers</footer>
   </main>
 </body>
 </html>
