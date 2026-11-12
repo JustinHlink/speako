@@ -15,7 +15,7 @@ progress, or API usage. It does not add a Curator page.
    Record, stop, inspect the transcript, then Continue. Real speech/replies need
    the privately configured provider key; automated tests use provider doubles.
 3. On a saved AI reply click Flag this reply. Expect confirmation and a disabled
-   Flag submitted button. Reload: the same reply remains flagged. The opening
+   Flag submitted button and a submission timing tag (suggested target: 1 s). Reload: the same reply remains flagged. The opening
    has no flag button because it is not a saved learner/AI turn.
 4. Block the flag request in browser developer tools and submit on another turn:
    expect an error and an enabled retry button, without changing lesson progress.

@@ -87,10 +87,6 @@ async function loadMap() {
     if(session && session.lesson_id!==lessonId){session=null;lastReply='';$('messages').replaceChildren();}
     reopenedSummary=null;
     showLesson(lesson);
-    $('goal').textContent=lesson.grammar_goal;
-    $('lesson-grammar').textContent=lesson.grammar_goal;
-    $('lesson-turn-limit').textContent=lesson.turn_limit+' exchanges';
-    $('vocabulary').replaceChildren();wordList($('vocabulary'),lesson.target_words);
     error();render();
   });
 }
