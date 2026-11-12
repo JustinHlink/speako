@@ -6,14 +6,15 @@
   const csrf=()=>document.cookie.split('; ').find(v=>v.startsWith('csrftoken='))?.split('=')[1] || '';
   function notice(text='') {$('review-error').textContent=text;$('review-error').hidden=!text;}
   async function api(url, data) {
+    const started=Date.now();let succeeded=false;
     const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
     try {
       const response=await fetch(url,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json','X-CSRFToken':csrf()}:{},body:data?JSON.stringify(data):undefined,signal:controller.signal});
       const result=await response.json();
       if(!response.ok){const error=new Error(response.status===401?'Your session expired. Sign in again from the home page.':response.status===403?'A reviewer account is required.':result.error?.message || 'Request failed.');error.code=result.error?.code;error.status=response.status;throw error;}
-      return result;
+      succeeded=true;return result;
     } catch(error) {if(error.name==='AbortError')throw new Error('The request timed out. Refresh the queue to check its current state.');throw error;}
-    finally {clearTimeout(timer);}
+    finally {clearTimeout(timer);const elapsed=Date.now()-started;const tag=$('review-timing');tag.textContent=(data?'Save decision':'Load queue')+' · '+(elapsed/1000).toFixed(2)+' s / target ≤ 1 s';tag.className='timing '+(succeeded?(elapsed>1000?'slow':'fast'):'failed');tag.hidden=false;}
   }
   function text(host,label,value){const p=document.createElement('p');const title=document.createElement('strong');title.textContent=label+': ';p.append(title,document.createTextNode(value));host.append(p);}
   function lock(value){saving=value;$('review-refresh').disabled=value;for(const button of queue.querySelectorAll('button'))button.disabled=value;}
