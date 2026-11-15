@@ -563,13 +563,21 @@ def list_flags(request):
     GET /api/flag/list/
     Reviewer fetches list of Unresolved flagged turns (US-13 AC1).
     """
-    unresolved_flags = Flag.objects.filter(status='Unresolved').select_related('turn', 'turn__attempt__lesson')
+    unresolved_flags = Flag.objects.filter(status='Unresolved').select_related('turn', 'turn__correction', 'turn__attempt__lesson').order_by('flagged_at', 'id')
     flag_list = []
     for f in unresolved_flags:
         flag_list.append({
             'id': f.id,
             'turn_id': f.turn.id,
             'scenario': f.turn.attempt.lesson.scenario,
+            'grammar_goal': f.turn.attempt.lesson.grammar_goal,
+            'target_words': list(f.turn.attempt.lesson.words.values_list('word', flat=True)),
+            'opening': f.turn.attempt.opening_line,
+            'turn_number': f.turn.turn_number,
+            'history': [{'learner_text': t.learner_text, 'ai_reply': t.ai_reply}
+                        for t in f.turn.attempt.turns.filter(turn_number__lt=f.turn.turn_number).order_by('turn_number')],
+            'correction': {'explanation': f.turn.correction.explanation,
+                           'example': f.turn.correction.corrected_example} if hasattr(f.turn, 'correction') else None,
             'learner_text': f.turn.learner_text,
             'ai_reply': f.turn.ai_reply,
             'flagged_at': f.flagged_at.isoformat(),

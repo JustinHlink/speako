@@ -21,6 +21,7 @@
         <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
         <button type="submit" class="secondary">Sign in</button>
       </form>
+      {% if user.is_authenticated and user.role == "Reviewer" %}<p><a href="/review/">Open review queue</a></p>{% endif %}
       <button id="sign-out" class="secondary" hidden>Sign out</button>
     </section>
     <div id="setup" class="setup" role="status" hidden></div>

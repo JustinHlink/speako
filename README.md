@@ -183,3 +183,10 @@ still prevent live recognition or replies; a tag and passing simulated tests do
 not guarantee Gemini availability. Supply the instructor's key privately in
 .env, or let the instructor configure their own unbilled project. Never commit
 credentials or publish them in the submission document.
+
+## Reviewer web page (Sprint 4)
+
+Reviewer accounts can use `/review/` to inspect flagged responses and record
+Acceptable or Incorrect decisions. Sign in as reviewer1 with the password chosen
+when running seed_demo_users. Learner and Curator access is denied. The Curator
+web interface is not implemented. See [Reviewer checks](docs/sprint4-reviewer.md).
