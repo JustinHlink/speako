@@ -31,7 +31,7 @@ this PR's automated validation; generated speech content still needs a live chec
 
 ## Automated checks
 
-- `python manage.py test` (121 backend tests)
+- `python manage.py test` (122 backend tests)
 - Run every `practice/tests*.cjs` file with Node, including tests_flags_page.cjs
   and tests_customs_page.cjs.
 - `python manage.py makemigrations --check --dry-run`

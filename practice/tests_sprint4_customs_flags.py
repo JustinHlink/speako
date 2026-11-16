@@ -57,6 +57,45 @@ class CustomsFlowTests(TestCase):
         self.assertFalse(Correction.objects.filter(turn__attempt=attempt).exists())
         self.assertIn('passport',attempt.turns.get().ai_reply)
 
+    @patch('practice.providers.reply')
+    def test_officer_correction_is_saved_once_and_included_in_summary(self, reply):
+        reply.return_value = {
+            'reply': 'Thank you. How long will you stay?',
+            'correction_explanation': 'Use am after I.',
+            'corrected_example': 'I am here for a holiday.',
+            'off_topic': False,
+        }
+        attempt = LessonAttempt.objects.create(
+            learner=self.user, lesson=self.customs,
+            opening_line=scenarios.details(self.customs)['opening'],
+            pending_id='customs-correction', pending_transcript='I is here for a holiday.')
+        payload = {'attempt_id': str(attempt.pk), 'pending_id': attempt.pending_id}
+        result = self.client.post('/api/reply/', payload, content_type='application/json')
+        self.assertEqual(result.status_code, 200, result.content)
+        turn = result.json()['attempt']['turns'][0]
+        self.assertEqual(turn['correction'], {
+            'explanation': 'Use am after I.', 'example': 'I am here for a holiday.'})
+        self.assertIn('stay', turn['reply'])
+        self.assertNotIn('menu', turn['reply'])
+        self.assertIn('Act as a customs officer', reply.call_args.args[1])
+        self.assertEqual(self.client.post('/api/reply/', payload, content_type='application/json').status_code, 200)
+        self.assertEqual(Correction.objects.filter(turn__attempt=attempt).count(), 1)
+        reply.assert_called_once()
+        reply.return_value = {'reply': 'Thank you.', 'correction_explanation': '',
+                              'corrected_example': '', 'off_topic': False}
+        for i in range(2, 6):
+            attempt.refresh_from_db()
+            attempt.pending_id = f'customs-after-correction-{i}'
+            attempt.pending_transcript = 'I will stay ten days.'
+            attempt.save()
+            response = self.client.post('/api/reply/', {
+                'attempt_id': str(attempt.pk), 'pending_id': attempt.pending_id}, content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+        summary = self.client.get(f'/api/attempts/{attempt.pk}/summary/').json()['summary']
+        self.assertEqual(summary['corrections'], [{
+            'original': 'I is here for a holiday.',
+            'explanation': 'Use am after I.', 'example': 'I am here for a holiday.'}])
+
     def test_customs_draft_and_unauthorized_start_are_rejected(self):
         self.customs.status='Draft';self.customs.save()
         self.assertEqual(self.client.post('/api/start/',{'lesson_id':self.customs.pk},content_type='application/json').status_code,409)

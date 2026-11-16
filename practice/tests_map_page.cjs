@@ -56,7 +56,7 @@ async function loadPage(attempt, mapMode = 'network') {
         if (mapMode === 'json') return {ok:true,json:async()=>{throw new Error('Bad JSON');}};
         return {ok:true,json:async()=>({lessons:[]})};
       }
-      if (url === '/api/reply/') return {ok:true,json:async()=>({attempt:{...attempt,pending:null,turns:[...attempt.turns,{learner:'Yes please.',reply:'Here is your water.',correction:null}]}})};
+      if (url === '/api/reply/') return {ok:true,json:async()=>({attempt:{...attempt,status:attempt.turns.length===4?'Completed':attempt.status,pending:null,turns:[...attempt.turns,{learner:'Yes please.',reply:'Here is your water.',correction:null}]}})};
       return {ok:true,json:async()=>status};
     },
   });
@@ -93,6 +93,7 @@ async function loadPage(attempt, mapMode = 'network') {
     assert.equal(pending.session().pending,'');
     assert.equal(pending.session().turns.length,3);
     assert.equal(pending.elements.record.disabled,false);
+    assert.equal(pending.requests.filter(url=>url==='/api/lessons/').length,1,'Ordinary replies do not reload the map');
     assert.equal(pending.elements.error?.hidden ?? true,true);
     assert.ok(!pending.elements.state.textContent.includes('failed'));
   }
@@ -102,6 +103,11 @@ async function loadPage(attempt, mapMode = 'network') {
     assert.equal(page.elements['map-retry'].hidden,true);
     assert.equal(page.elements['map-status'].hidden,false);
   }
+  const finalTurn = await loadPage({...ATTEMPT,turns:Array.from({length:4},(_,i)=>({...ATTEMPT.turns[0],number:i+1}))},'ok');
+  const lastConfirmation=finalTurn.elements.confirm.onclick();
+  await new Promise(resolve=>setImmediate(resolve));
+  finalTurn.spoken[0].onend();await lastConfirmation;
+  assert.equal(finalTurn.requests.filter(url=>url==='/api/lessons/').length,2,'Final reply refreshes completed map status');
   console.log('Map failure isolation checks passed (network, HTTP, JSON, hanging request, retry, startup and saved reply).');
 })().catch(error => {console.error(error);process.exit(1);});
 

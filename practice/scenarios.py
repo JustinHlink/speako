@@ -1,7 +1,6 @@
 """Presentation and role instructions for the two fixed English scenarios."""
 RESTAURANT = 'Ordering at a Restaurant'
 CUSTOMS = 'Passing Customs'
-CUSTOMS_WORDS = ['passport', 'visit', 'holiday', 'business', 'days', 'stay', 'bag', 'declare', 'please', 'purpose', 'trip', 'long', 'how', 'anything', 'nothing', 'ten']
 
 def details(lesson):
     title = lesson.scenario if lesson else RESTAURANT
