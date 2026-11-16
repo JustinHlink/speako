@@ -36,3 +36,12 @@ do not automatically rewrite AI replies or change lesson content.
 The existing atomic API update prevents a later review from overwriting a saved
 decision. The frontend removes stale cards while refreshing and clears private
 queue data if authorization expires.
+
+
+## Optional synthetic UI fixtures
+
+`python seed_flags.py` creates six clearly synthetic reviewer examples under
+review-fixture-learner1/2 (unusable passwords). Existing learners, flags,
+progress and saved review decisions are preserved. Rerunning is idempotent.
+Fixtures are Exited attempts, never genuine completed lessons or live provider
+outputs. Use real learner flags when demonstrating the actual end-to-end flow.

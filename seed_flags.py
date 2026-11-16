@@ -6,18 +6,26 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'speako.settings')
 django.setup()
 
 from practice.models import User, Lesson, LessonAttempt, Turn, Flag, Correction
+from django.db import transaction
+from django.utils import timezone
 
-learner1 = User.objects.get(username='learner1')
-learner2 = User.objects.get(username='learner2')
-lesson = Lesson.objects.first()
+# Synthetic reviewer UI fixtures only. Never replace real learner history or flags.
+def fixture_learner(username):
+    user, created = User.objects.get_or_create(username=username, defaults={'role': 'Learner'})
+    if created:
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+    return user
 
-# Clear existing unresolved test flags and their completed/exited test attempts
-Flag.objects.filter(status='Unresolved').delete()
+lesson = Lesson.objects.filter(scenario='Ordering at a Restaurant', status='Published').first()
+if lesson is None:
+    raise RuntimeError('Run migrations to create the restaurant lesson before seeding review fixtures.')
+learner1 = fixture_learner('review-fixture-learner1')
+learner2 = fixture_learner('review-fixture-learner2')
 
 test_cases = [
     {
         'learner': learner1,
-        'status': 'Completed',
         'history': [
             ('Hello, good evening.', 'Good evening! Welcome to our restaurant. What would you like to drink?')
         ],
@@ -31,7 +39,6 @@ test_cases = [
     },
     {
         'learner': learner1,
-        'status': 'Exited',
         'history': [
             ('Can I see the menu please?', 'Here is the menu. Take your time.')
         ],
@@ -44,7 +51,6 @@ test_cases = [
     },
     {
         'learner': learner2,
-        'status': 'Completed',
         'history': [
             ('Could I see the menu?', "Of course, here is the menu. Today's special is grilled salmon."),
             ('Is the salmon fresh?', 'Yes, delivered fresh this morning.')
@@ -59,7 +65,6 @@ test_cases = [
     },
     {
         'learner': learner2,
-        'status': 'Exited',
         'history': [],
         'learner_text': 'Water.',
         'ai_reply': 'Certainly, still or sparkling water?',
@@ -70,7 +75,6 @@ test_cases = [
     },
     {
         'learner': learner1,
-        'status': 'Completed',
         'history': [
             ('Excuse me, waiter.', 'Yes, how may I help you?')
         ],
@@ -83,7 +87,6 @@ test_cases = [
     },
     {
         'learner': learner2,
-        'status': 'Completed',
         'history': [
             ('Everything was delicious, thank you.', 'I am glad you enjoyed the meal! Would you like the bill?')
         ],
@@ -96,48 +99,55 @@ test_cases = [
     }
 ]
 
-created_flags = []
-for case in test_cases:
-    attempt = LessonAttempt.objects.create(
-        learner=case['learner'],
-        lesson=lesson,
-        status=case['status'],
-        opening_line='Welcome to our restaurant! How can I help you today?'
-    )
-    turn_num = 1
-    for h_learner, h_ai in case['history']:
-        Turn.objects.create(
-            attempt=attempt,
-            turn_number=turn_num,
-            learner_text=h_learner,
-            ai_reply=h_ai,
-            pending_id=str(uuid.uuid4())
+with transaction.atomic():
+    created_flags = []
+    for index, case in enumerate(test_cases, 1):
+        attempt_id = uuid.uuid5(uuid.NAMESPACE_URL, f'https://speako.local/review-fixture/{index}')
+        # A repeated run preserves existing fixture reviews rather than reopening them.
+        if LessonAttempt.objects.filter(pk=attempt_id).exists():
+            continue
+        attempt = LessonAttempt.objects.create(
+            id=attempt_id,
+            learner=case['learner'],
+            lesson=lesson,
+            status='Exited',
+            ended_at=timezone.now(),
+            opening_line='Welcome to our restaurant! How can I help you today?'
         )
-        turn_num += 1
-    
-    flag_turn = Turn.objects.create(
-        attempt=attempt,
-        turn_number=turn_num,
-        learner_text=case['learner_text'],
-        ai_reply=case['ai_reply'],
-        pending_id=str(uuid.uuid4())
-    )
-    turn_num += 1
-    if case['correction']:
-        expl, ex = case['correction']
-        Correction.objects.create(turn=flag_turn, explanation=expl, corrected_example=ex)
-    
-    for a_learner, a_ai in case.get('after', []):
-        Turn.objects.create(
-            attempt=attempt,
-            turn_number=turn_num,
-            learner_text=a_learner,
-            ai_reply=a_ai,
-            pending_id=str(uuid.uuid4())
-        )
-        turn_num += 1
+        turn_num = 1
+        for h_learner, h_ai in case['history']:
+            Turn.objects.create(
+                attempt=attempt,
+                turn_number=turn_num,
+                learner_text=h_learner,
+                ai_reply=h_ai,
+                pending_id=str(uuid.uuid4())
+            )
+            turn_num += 1
 
-    flag = Flag.objects.create(turn=flag_turn, status='Unresolved')
-    created_flags.append(flag.id)
+        flag_turn = Turn.objects.create(
+            attempt=attempt,
+            turn_number=turn_num,
+            learner_text=case['learner_text'],
+            ai_reply=case['ai_reply'],
+            pending_id=str(uuid.uuid4())
+        )
+        turn_num += 1
+        if case['correction']:
+            expl, ex = case['correction']
+            Correction.objects.create(turn=flag_turn, explanation=expl, corrected_example=ex)
+
+        for a_learner, a_ai in case.get('after', []):
+            Turn.objects.create(
+                attempt=attempt,
+                turn_number=turn_num,
+                learner_text=a_learner,
+                ai_reply=a_ai,
+                pending_id=str(uuid.uuid4())
+            )
+            turn_num += 1
+
+        flag = Flag.objects.create(turn=flag_turn, status='Unresolved')
+        created_flags.append(flag.id)
 
 print(f'Successfully created {len(created_flags)} test flags: {created_flags}')

@@ -66,3 +66,34 @@ class ReviewerPageTests(TestCase):
         self.client.force_login(self.learner)
         self.assertEqual(self.client.post('/api/flag/submit/',{'turn_id':turn.pk},content_type='application/json').status_code,409)
         self.attempt.refresh_from_db();self.assertEqual(self.attempt.status,'In progress')
+
+    def test_complete_attempt_context_includes_later_turns(self):
+        Turn.objects.create(attempt=self.attempt,turn_number=3,learner_text='Thank you.',ai_reply='Goodbye.',pending_id='after-flag')
+        self.client.force_login(self.reviewer)
+        item=self.client.get('/api/flag/list/').json()['flags'][0]
+        self.assertEqual(item['attempt_id'],str(self.attempt.pk))
+        self.assertEqual([turn['turn_number'] for turn in item['turns']],[1,2,3])
+        self.assertEqual([turn['turn_number'] for turn in item['turns'] if turn['is_flagged']],[2])
+        self.assertEqual(item['turns'][1]['correction']['example'],'I like water.')
+
+    def test_seed_script_preserves_existing_flags_progress_and_reviews(self):
+        import runpy
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from pathlib import Path
+        previous_attempts=set(LessonAttempt.objects.values_list('pk',flat=True))
+        with redirect_stdout(StringIO()):
+            runpy.run_path(str(Path(__file__).resolve().parent.parent/'seed_flags.py'))
+        self.flag.refresh_from_db()
+        self.assertEqual(self.flag.status,'Unresolved')
+        fixtures=LessonAttempt.objects.filter(learner__username__startswith='review-fixture-')
+        self.assertEqual(fixtures.count(),6)
+        self.assertTrue(all(x.status=='Exited' for x in fixtures))
+        fixture_flag=Flag.objects.filter(turn__attempt__in=fixtures).first()
+        fixture_flag.status='Acceptable';fixture_flag.reviewer=self.reviewer;fixture_flag.save()
+        counts=(LessonAttempt.objects.count(),Flag.objects.count(),Turn.objects.count())
+        with redirect_stdout(StringIO()):
+            runpy.run_path(str(Path(__file__).resolve().parent.parent/'seed_flags.py'))
+        self.assertEqual((LessonAttempt.objects.count(),Flag.objects.count(),Turn.objects.count()),counts)
+        fixture_flag.refresh_from_db();self.assertEqual(fixture_flag.status,'Acceptable')
+        self.assertTrue(previous_attempts.issubset(set(LessonAttempt.objects.values_list('pk',flat=True))))

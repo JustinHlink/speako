@@ -284,6 +284,7 @@
             notice(error.message);
             $('review-status').textContent='Decision was not confirmed. Refresh the queue before retrying if the connection failed.';
             if(error.status===401 || error.status===403){
+              currentFlags=[];
               selectedFlagId=null;
               queue.replaceChildren();
             }
@@ -346,6 +347,7 @@
 
   if(globalThis.addEventListener){
     globalThis.addEventListener('popstate',()=>{
+      if(loading || saving)return;
       syncSelectedFromUrl();
       renderView();
     });
