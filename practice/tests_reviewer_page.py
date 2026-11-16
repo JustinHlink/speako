@@ -15,6 +15,8 @@ class ReviewerPageTests(TestCase):
 
     def test_page_and_apis_require_reviewer_role(self):
         self.assertEqual(self.client.get('/review/').status_code,401)
+        self.assertEqual(self.client.get('/api/flag/list/').status_code,401)
+        self.assertEqual(self.client.post('/api/flag/review/',{'flag_id':self.flag.pk,'status':'Incorrect'},content_type='application/json').status_code,401)
         for role in ['Learner','Curator']:
             user=User.objects.create_user(username='denied-'+role,role=role);self.client.force_login(user)
             self.assertEqual(self.client.get('/review/').status_code,403)
@@ -24,6 +26,22 @@ class ReviewerPageTests(TestCase):
         self.client.force_login(self.reviewer)
         page=self.client.get('/review/');self.assertEqual(page.status_code,200)
         self.assertContains(page,'reviewer.js');self.assertIn('csrftoken',page.cookies)
+
+    def test_non_learner_roles_cannot_submit_flags(self):
+        unflagged_turn=Turn.objects.get(attempt=self.attempt,turn_number=1)
+        for role in ['Reviewer','Curator']:
+            user=User.objects.create_user(username='submit-denied-'+role,role=role);self.client.force_login(user)
+            res=self.client.post('/api/flag/submit/',{'turn_id':unflagged_turn.pk},content_type='application/json')
+            self.assertEqual(res.status_code,403)
+        self.assertFalse(Flag.objects.filter(turn=unflagged_turn).exists())
+
+    def test_register_cannot_escalate_to_reviewer_role(self):
+        res=self.client.post('/api/auth/register/',{'username':'attempted-reviewer','password':'password123','role':'Reviewer'},content_type='application/json')
+        self.assertEqual(res.status_code,201)
+        created_user=User.objects.get(username='attempted-reviewer')
+        self.assertEqual(created_user.role,'Learner')
+        self.assertEqual(self.client.get('/review/').status_code,403)
+        self.assertEqual(self.client.get('/api/flag/list/').status_code,403)
 
     def test_queue_contains_context_and_saved_decision_removes_item(self):
         self.client.force_login(self.reviewer)
@@ -48,7 +66,10 @@ class ReviewerPageTests(TestCase):
         self.assertEqual(client.post('/api/flag/review/',payload,content_type='application/json',HTTP_X_CSRFTOKEN=token).status_code,200)
 
     def test_reviewer_link_visible_only_to_reviewer(self):
+        self.assertNotContains(self.client.get('/'),'Open review queue')
         self.client.force_login(self.learner);self.assertNotContains(self.client.get('/'),'Open review queue')
+        curator=User.objects.create_user(username='home-curator',role='Curator')
+        self.client.force_login(curator);self.assertNotContains(self.client.get('/'),'Open review queue')
         self.client.force_login(self.reviewer);self.assertContains(self.client.get('/'),'Open review queue')
 
     def test_learner_flag_to_reviewer_decision_end_to_end(self):
