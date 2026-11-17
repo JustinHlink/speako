@@ -335,7 +335,7 @@ def start_lesson(request):
 def transcribe_audio(request):
     """
     POST /api/transcribe/
-    Upload audio file, reserve budget, call Gemini Transcribe, and store pending_transcript.
+    Upload audio file, reserve budget, call the speech provider, and store pending_transcript.
     """
     attempt = find_attempt(request, request.POST.get('attempt_id'))
     if attempt is None:
@@ -403,7 +403,7 @@ def reply_problem(result, lesson):
 def submit_reply(request):
     """
     POST /api/reply/
-    Confirm transcript (Continue), invoke Gemini conversation, validate vocabulary, and save Turn.
+    Confirm transcript (Continue), ask the reply provider, validate vocabulary, and save Turn.
     """
     data = body(request)
     attempt = find_attempt(request, data.get('attempt_id'))
