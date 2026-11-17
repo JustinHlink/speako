@@ -110,12 +110,12 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
 GEMINI_FREE_TIER_CONFIRMED = os.environ.get('GEMINI_FREE_TIER_CONFIRMED', 'false').lower() == 'true'
 
-# Speech-to-text runs locally with faster-whisper; gemini keeps the earlier API path.
+# whisper runs speech-to-text on this computer; gemini sends the audio to the Gemini API.
 SPEECH_PROVIDER = os.environ.get('SPEECH_PROVIDER', 'whisper').strip().lower()
 WHISPER_MODEL = os.environ.get('WHISPER_MODEL', 'small.en')
 WHISPER_COMPUTE_TYPE = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
 
-# Conversation replies come from Claude Haiku; gemini keeps the earlier API path.
+# claude gets the partner's replies from Claude Haiku; gemini gets them from the Gemini API.
 REPLY_PROVIDER = os.environ.get('REPLY_PROVIDER', 'claude').strip().lower()
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-5-5')
