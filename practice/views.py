@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import User, Lesson, LessonWord, SharedBeginnerWord, LessonAttempt, Turn, Correction, LessonSummary, Flag, ApiUsage
-from . import gemini, progress, vocabulary, providers, transcripts
+from . import gemini, progress, vocabulary, providers, transcripts, scenarios
 from .lesson import LESSON, ALLOWED, TARGETS, outside_words, make_summary
 
 
@@ -29,7 +29,7 @@ def error(status, code, message):
 
 
 def attempt_snapshot(attempt):
-    turns = attempt.turns.select_related('correction').order_by('turn_number')
+    turns = attempt.turns.select_related('correction', 'flag').order_by('turn_number')
     return {
         'attempt_id': str(attempt.id),
         'lesson_id': attempt.lesson_id,
@@ -71,6 +71,8 @@ def lesson_progress(learner, lesson):
 def turn_snapshot(turn):
     correction = getattr(turn, 'correction', None)
     return {
+        'id': turn.pk,
+        'flagged': hasattr(turn, 'flag'),
         'number': turn.turn_number,
         'learner': turn.learner_text,
         'reply': turn.ai_reply,
@@ -272,7 +274,8 @@ def get_lesson_detail(request, lesson_id):
             'grammar_goal': lesson.grammar_goal,
             'turn_limit': lesson.turn_limit,
             'target_words': target_words,
-            'last_completed_attempt_id': str(last_completed_attempt.id) if last_completed_attempt else None
+            'last_completed_attempt_id': str(last_completed_attempt.id) if last_completed_attempt else None,
+            'presentation': scenarios.details(lesson)
         }
     })
 
@@ -293,7 +296,8 @@ def status(request):
                    'title': lesson.scenario if lesson else LESSON['title'],
                    'grammar': lesson.grammar_goal if lesson else LESSON['grammar'],
                    'target_words': list(lesson.words.values_list('word', flat=True)) if lesson else [],
-                   'turn_limit': lesson.turn_limit if lesson else 5},
+                   'turn_limit': lesson.turn_limit if lesson else 5,
+                   'presentation': scenarios.details(lesson)},
         'targets': TARGETS, 'api_ready': ok, 'setup_message': message,
         'user': {'username': request.user.username, 'role': request.user.role} if request.user.is_authenticated else None,
         'usage': providers.usage(), 'attempt': attempt_snapshot(attempt) if attempt else None,
@@ -313,7 +317,8 @@ def start_lesson(request):
     if not isinstance(lesson_id, int):
         return error(400, 'INVALID_INPUT', 'lesson_id is required.')
     lesson = Lesson.objects.filter(pk=lesson_id).first()
-    if lesson is None or not vocabulary.lesson_is_configured(lesson) or vocabulary.outside_words(OPENING_LINE, lesson):
+    opening = scenarios.details(lesson)['opening'] if lesson else ''
+    if lesson is None or not vocabulary.lesson_is_configured(lesson) or vocabulary.outside_words(opening, lesson):
         return error(409, 'LESSON_UNAVAILABLE', 'This lesson is not ready yet. Choose another lesson.')
 
     with transaction.atomic():
@@ -326,7 +331,7 @@ def start_lesson(request):
             old.pending_id = ''
             old.ended_at = timezone.now()
             old.save(update_fields=['status', 'pending_transcript', 'pending_id', 'ended_at'])
-        attempt = LessonAttempt.objects.create(learner=request.user, lesson=lesson, opening_line=OPENING_LINE)
+        attempt = LessonAttempt.objects.create(learner=request.user, lesson=lesson, opening_line=opening)
     return JsonResponse({'attempt': attempt_snapshot(attempt)})
 
 
@@ -374,8 +379,9 @@ Grammar goal: {lesson.grammar_goal}
 Lesson words to encourage: {lesson_words}.
 All reply and corrected-example words must be in this allowed list: {allowed}.
 Do not invent prices. Keep replies short (at most two sentences).
-Prefer plain short wording: for an accepted order, acknowledge it and ask one simple question about food, a drink, or the bill. Do not repeat a question that the learner has already answered.
-Before returning JSON, check every reply and corrected-example word against the allowed list. Use a simpler sentence instead of any word that is missing. Do not introduce descriptive food words, quantities, or service details outside the list.
+{scenarios.details(lesson)['role_instructions']}
+Do not repeat a question that the learner has already answered.
+Before returning JSON, check every reply and corrected-example word against the allowed list. Use a simpler sentence instead of any word that is missing. Do not introduce descriptive words, quantities, or details outside the list.
 Correct ONLY vocabulary/grammar mistakes covered by the goal. If there is a relevant mistake, give ONE short sentence of explanation and ONE corrected example. Otherwise both correction strings must be empty.
 A grammatically correct off-topic answer must NOT be labeled wrong: set off_topic true, leave corrections empty, and ask a question about the scenario.
 If the learner is unsure (for example, 'I do not know'), reassure them briefly, offer one or two easy choices, and ask an easy question about the scenario. Uncertainty is not a language mistake.
