@@ -1,4 +1,4 @@
-"""Claude Haiku replies. The SDK client is faked, so no test reaches the network or uses budget."""
+"""Claude Haiku replies. These tests fake the SDK client, so they make no network calls and use no budget."""
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch

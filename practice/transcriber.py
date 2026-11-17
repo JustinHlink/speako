@@ -9,7 +9,7 @@ from .gemini import ProviderError
 
 logger = logging.getLogger(__name__)
 
-# Whisper reads this as earlier speech, so it keeps beginner mistakes instead of repairing them.
+# Whisper reads this as earlier speech, copies its style and keeps beginner mistakes as spoken.
 # It has no lesson words, so it cannot add a target word to a learner's transcript.
 VERBATIM_PROMPT = "Um, he go to school yesterday. She don't likes it. They is happy."
 # Whisper rates each segment; segments that are probably silence or noise are dropped.

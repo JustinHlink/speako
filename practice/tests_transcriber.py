@@ -1,4 +1,4 @@
-"""Local speech-to-text (faster-whisper). A fake model is used, so no model is downloaded."""
+"""Local speech-to-text (faster-whisper). These tests use a fake model and download nothing."""
 import json
 import re
 from unittest.mock import patch

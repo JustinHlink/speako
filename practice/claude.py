@@ -1,4 +1,4 @@
-"""Conversation replies from Claude Haiku. Every call passes the same $10 usage guard as before."""
+"""Conversation replies from Claude Haiku. Every call goes through the $10 usage guard in gemini.py."""
 import json
 import logging
 
