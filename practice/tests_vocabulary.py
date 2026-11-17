@@ -64,6 +64,7 @@ OFF_LIST_REPLY = {'reply': 'Would you like quantum physics?', 'correction_explan
                   'corrected_example': '', 'off_topic': False}
 
 
+@override_settings(REPLY_PROVIDER='gemini')  # These tests fake the Gemini client.
 class VocabularyEndpointTests(TestCase):
 
     def setUp(self):
