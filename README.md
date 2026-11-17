@@ -21,7 +21,7 @@ The app runs locally with Django and SQLite. A speech model on your own computer
 
 | System | How |
 |---|---|
-| Windows | Install Python 3.12 from [python.org](https://www.python.org/downloads/) and tick **Add python.exe to PATH**. Or run `winget install -e --id Python.Python.3.12` in PowerShell. |
+| Windows | Install Python 3.12 from [python.org](https://www.python.org/downloads/) and tick "Add python.exe to PATH". Or run `winget install -e --id Python.Python.3.12` in PowerShell. |
 | macOS | Install Python 3.12 from [python.org](https://www.python.org/downloads/), or run `brew install python@3.12` if you use Homebrew. |
 | Linux | Ubuntu or Debian: `sudo apt install python3 python3-venv`. Other systems: use the package manager for Python 3.10 to 3.13 and its `venv` module. |
 
@@ -100,7 +100,7 @@ macOS or Linux:
 for f in practice/tests_*.cjs; do node "$f"; done
 ```
 
-The first command runs the Django tests. The second runs the frontend tests. The tests fake the speech model and the AI providers, and they run without the API keys in `.env`. So they make no API calls, download no model and use none of the budget.
+The first command runs the Django tests. The second runs the frontend tests. The tests fake the speech model and the AI providers and ignore the API keys in `.env`, so they make no API calls and use none of the budget.
 
 ## Settings in `.env`
 
@@ -109,19 +109,20 @@ The setup creates `.env` for you. Change a value only when you need to, then res
 | Setting | Default | Meaning |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | (empty) | The Claude API key. Keep it only in `.env`. |
-| `REPLY_PROVIDER` | `claude` | `claude` uses Claude Haiku for replies. `gemini` uses the earlier Gemini client. |
+| `REPLY_PROVIDER` | `claude` | `claude` uses Claude Haiku for replies. `gemini` gets them from the Gemini API. |
 | `CLAUDE_MODEL` | `claude-haiku-5-5` | The only model the usage guard allows. |
 | `SPEECH_PROVIDER` | `whisper` | `whisper` turns speech into text on this computer. `gemini` sends the recording to the Gemini API. |
-| `WHISPER_MODEL` | `small.en` | `small.en` was the most accurate in our tests. `base.en` is smaller and faster, but it lost grammar mistakes in our tests. |
+| `WHISPER_MODEL` | `small.en` | `small.en` was the most accurate in our tests. `base.en` is smaller and faster, but it dropped some grammar mistakes. |
 | `PROJECT_BUDGET_USD`, `MAX_API_ATTEMPTS` | `10`, `500` | The project-wide usage guard. |
 
 The `GEMINI_*` settings are used only when a provider setting is `gemini`.
 
 ## API key safety
 
-- Never put an API key in the repository, a commit, an issue, the shared document or a chat message. The repository is public, so anyone could use a key that is pushed.
+- Never put an API key in the repository, a commit, an issue, the shared document or a group chat. The repository is public, so anyone could use a key that is pushed.
 - Each person keeps the key only in their own `.env`. Git ignores this file.
-- The team lead shares keys privately, for example with a one-time secret link that expires after one view. A separate key for each person is best: the team lead can disable one key without stopping the others.
+- The team lead shares the key privately, for example in a direct message or a one-time secret link that expires after one view.
+- The organization has a monthly spend limit, so a leaked key cannot run up a large bill.
 - If a key is exposed, disable it in the Claude Console at once and create a new one.
 
 ## API budget
