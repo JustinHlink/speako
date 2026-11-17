@@ -1,8 +1,9 @@
 from django.urls import path
-from practice import views
+from practice import views, reviewer
 
 urlpatterns = [
     path('', views.home),
+    path('review/', reviewer.page),
 
     path('api/auth/login/', views.api_login),
     path('api/auth/logout/', views.api_logout),

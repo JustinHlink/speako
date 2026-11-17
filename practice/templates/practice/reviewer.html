@@ -1,0 +1,233 @@
+{% load static %}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speako · Review queue</title><link rel="stylesheet" href="{% static 'practice/app.css' %}">
+<style>
+  :root {
+    --review-columns: 3;
+  }
+  #review-queue {
+    display: grid;
+    grid-template-columns: repeat(var(--review-columns, 3), minmax(0, 1fr));
+    gap: 20px;
+    align-items: stretch;
+  }
+  @media (max-width: 1024px) {
+    #review-queue {
+      grid-template-columns: repeat(min(var(--review-columns, 3), 2), minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 680px) {
+    #review-queue {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .review-card {
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    padding: 20px;
+    height: 320px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+  }
+  .review-card:hover,
+  .review-card:focus-visible {
+    border-color: var(--green);
+    background-color: #f6fbf8;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(23, 110, 92, 0.12);
+    outline: none;
+  }
+  .review-card:active {
+    transform: translateY(-1px);
+  }
+  .review-card-header {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .review-card-header h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .review-card-time {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .review-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .review-bubble {
+    background: var(--mint);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    position: relative;
+  }
+  .review-bubble.learner {
+    background: #f4ede1;
+  }
+  .review-bubble-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .review-bubble.learner .review-bubble-label {
+    color: #875a0c;
+  }
+  .review-text-content {
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  
+  .review-text-content.fade-text {
+    max-height: 48px;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 20px, rgba(0,0,0,0) 48px);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 20px, rgba(0,0,0,0) 48px);
+  }
+  .review-card-hint {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: right;
+    margin-top: auto;
+    padding-top: 6px;
+    transition: color 0.15s ease;
+  }
+  .review-card:hover .review-card-hint,
+  .review-card:focus-visible .review-card-hint {
+    color: var(--green);
+  }
+
+  .attempt-detail-view {
+    grid-column: 1 / -1;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: #fff;
+    padding: 26px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  }
+  .attempt-detail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .attempt-meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .attempt-meta-grid strong {
+    color: var(--ink);
+  }
+  /* 纵向滚动对话列表 */
+  .attempt-scroll-list {
+    max-height: 460px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    margin-bottom: 20px;
+  }
+  .turn-row {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  /* 被标记的对话采用高透明度浅红高亮 */
+  .turn-row.flagged-turn {
+    background: rgba(225, 55, 55, 0.12);
+    border: 1.5px solid rgba(205, 45, 45, 0.4);
+    box-shadow: 0 2px 8px rgba(225, 55, 55, 0.08);
+  }
+  .turn-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .flagged-badge {
+    background: rgba(205, 45, 45, 0.15);
+    color: var(--red);
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.4px;
+  }
+  .turn-dialogue-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .turn-msg {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--mint);
+    font-size: 14px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .turn-msg.learner {
+    background: #f4ede1;
+  }
+  .turn-row.flagged-turn .turn-msg {
+    background: rgba(255, 255, 255, 0.72);
+  }
+  .review-detail-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 8px;
+  }
+</style>
+<script defer src="{% static 'practice/reviewer.js' %}"></script></head>
+<body><header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">Conversation review</span></header>
+<main><div class="intro"><div><p class="eyebrow">REVIEWER</p><h1>Flagged responses</h1><p class="subtitle">Review the lesson context before recording a decision.</p></div><button id="review-sign-out" class="secondary">Sign out</button></div>
+<p>Signed in as {{ user.username }}</p>
+<div class="row"><h2>Unresolved queue</h2><button id="review-refresh" class="secondary">Refresh queue</button></div>
+<div id="review-timing" class="timing" hidden></div>
+<p id="review-status" role="status" aria-live="polite"></p>
+<div id="review-error" class="setup" role="alert" hidden></div>
+<section id="review-queue" aria-label="Unresolved flagged responses"></section>
+</main></body></html>

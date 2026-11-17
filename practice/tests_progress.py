@@ -99,7 +99,7 @@ class AccountProgressTests(TestCase):
         attempt.save()
         return self.post('/api/reply/', {'attempt_id': attempt_id, 'pending_id': attempt.pending_id})
 
-    @patch('practice.gemini.generate', return_value=REPLY)
+    @patch('practice.providers.reply', return_value=REPLY)
     def test_completed_lesson_is_still_completed_after_signing_out_and_in(self, provider):
         self.sign_in('anna', 'anna-pass')
         attempt_id = self.start()['attempt_id']
@@ -112,7 +112,7 @@ class AccountProgressTests(TestCase):
         detail = self.client.get(f'/api/lessons/{self.restaurant.id}/').json()['lesson']
         self.assertEqual(detail['last_completed_attempt_id'], attempt_id)
 
-    @patch('practice.gemini.generate', return_value=REPLY)
+    @patch('practice.providers.reply', return_value=REPLY)
     def test_lesson_left_halfway_shows_in_progress_and_restarts_at_the_first_turn(self, provider):
         self.sign_in('anna', 'anna-pass')
         first = self.start()

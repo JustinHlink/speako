@@ -1,5 +1,6 @@
 import os
 import secrets
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,6 +26,16 @@ if not SECRET_KEY:
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'testserver', '.pythonanywhere.com']
+# A hosted copy adds its own address. Render sets RENDER_EXTERNAL_HOSTNAME by itself.
+HOSTED_NAMES = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
+if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
+    HOSTED_NAMES.append(os.environ['RENDER_EXTERNAL_HOSTNAME'])
+ALLOWED_HOSTS += HOSTED_NAMES
+CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in HOSTED_NAMES]
+if HOSTED_NAMES:
+    # The host ends HTTPS at its proxy and tells Django through this header.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True
 
 # Application Definition
 INSTALLED_APPS = [
@@ -46,6 +57,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+if HOSTED_NAMES:
+    # On a host, WhiteNoise serves the CSS and JS files. On a local computer, runserver does it.
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'speako.urls'
 
@@ -97,6 +111,7 @@ USE_TZ = True
 
 # Static Files & Session Security
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # filled by collectstatic on a host
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_COOKIE_HTTPONLY = True
@@ -108,6 +123,25 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
 GEMINI_FREE_TIER_CONFIRMED = os.environ.get('GEMINI_FREE_TIER_CONFIRMED', 'false').lower() == 'true'
+
+# groq runs Whisper on Groq's servers; whisper runs it on this computer; gemini uses the Gemini API.
+SPEECH_PROVIDER = os.environ.get('SPEECH_PROVIDER', 'groq').strip().lower()
+WHISPER_MODEL = os.environ.get('WHISPER_MODEL', 'small.en')
+WHISPER_COMPUTE_TYPE = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
+# Groq settings, used when SPEECH_PROVIDER=groq.
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+GROQ_STT_MODEL = os.environ.get('GROQ_STT_MODEL', 'whisper-large-v3')
+# whisper: if Groq fails, use the local model. none: no backup (a host without room for the model).
+SPEECH_FALLBACK = os.environ.get('SPEECH_FALLBACK', 'whisper').strip().lower()
+
+# claude gets the partner's replies from Claude Haiku; gemini gets them from the Gemini API.
+REPLY_PROVIDER = os.environ.get('REPLY_PROVIDER', 'claude').strip().lower()
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-5-5')
+
+# The test suite never uses real API keys, so no test can reach a live provider.
+if sys.argv[1:2] == ['test']:
+    GEMINI_API_KEY = ANTHROPIC_API_KEY = GROQ_API_KEY = ''
 
 PROJECT_BUDGET_USD = float(os.environ.get('PROJECT_BUDGET_USD', '10'))
 RECORDED_EXTERNAL_SPEND_USD = float(os.environ.get('RECORDED_EXTERNAL_SPEND_USD', '0'))

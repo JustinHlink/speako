@@ -1,0 +1,28 @@
+# Render setup for a hosted copy of Speako (free plan, Groq speech-to-text, Claude Haiku replies).
+# The free plan keeps no files after a restart, so the start command rebuilds the database
+# and the demo accounts each time. Learner progress is lost when the service restarts.
+services:
+  - type: web
+    name: speako
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && python manage.py seed_demo_users && gunicorn speako.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 60
+    healthCheckPath: /api/status/
+    envVars:
+      - key: SPEECH_PROVIDER
+        value: groq
+      - key: SPEECH_FALLBACK
+        value: none
+      - key: REPLY_PROVIDER
+        value: claude
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      # Render asks for these three values when the service is created. Never put them in this file.
+      # Use a private demo password here: the README password is public, and the site is on the internet.
+      - key: SPEAKO_DEMO_PASSWORD
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

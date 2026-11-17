@@ -2,8 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $speakoPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $speakoPython)) {
-    Write-Host 'Create the virtual environment first: py -m venv .venv'
-    Write-Host 'Then install dependencies: .\.venv\Scripts\python.exe -m pip install -r requirements.txt'
+    Write-Host 'Run the setup first: double-click setup.bat'
     exit 1
 }
 & $speakoPython manage.py migrate --noinput

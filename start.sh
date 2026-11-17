@@ -3,8 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 speako_python=".venv/bin/python"
 if [ ! -x "$speako_python" ]; then
-    echo 'Create the virtual environment first: python3 -m venv .venv'
-    echo 'Then install dependencies: .venv/bin/python -m pip install -r requirements.txt'
+    echo 'Run the setup first: bash setup.sh'
     exit 1
 fi
 "$speako_python" manage.py migrate --noinput
