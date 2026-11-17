@@ -1,5 +1,6 @@
 import os
 import secrets
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -108,6 +109,20 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
 GEMINI_FREE_TIER_CONFIRMED = os.environ.get('GEMINI_FREE_TIER_CONFIRMED', 'false').lower() == 'true'
+
+# Speech-to-text runs locally with faster-whisper; gemini keeps the earlier API path.
+SPEECH_PROVIDER = os.environ.get('SPEECH_PROVIDER', 'whisper').strip().lower()
+WHISPER_MODEL = os.environ.get('WHISPER_MODEL', 'small.en')
+WHISPER_COMPUTE_TYPE = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
+
+# Conversation replies come from Claude Haiku; gemini keeps the earlier API path.
+REPLY_PROVIDER = os.environ.get('REPLY_PROVIDER', 'claude').strip().lower()
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-5-5')
+
+# The test suite never uses real API keys, so no test can reach a live provider.
+if sys.argv[1:2] == ['test']:
+    GEMINI_API_KEY = ANTHROPIC_API_KEY = ''
 
 PROJECT_BUDGET_USD = float(os.environ.get('PROJECT_BUDGET_USD', '10'))
 RECORDED_EXTERNAL_SPEND_USD = float(os.environ.get('RECORDED_EXTERNAL_SPEND_USD', '0'))
