@@ -2,3 +2,6 @@ Django==5.2.18
 asgiref==3.12.1
 sqlparse==0.6.0
 tzdata==2026.5
+faster-whisper==1.2.1
+av==13.1.0
+anthropic==2.9.0
