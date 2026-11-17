@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent
 ENV, EXAMPLE = ROOT / '.env', ROOT / '.env.example'
 DEMO_PASSWORD = os.environ.get('SPEAKO_DEMO_PASSWORD') or 'SpeakoDemo2026!'
 START = 'start.bat (double-click it)' if os.name == 'nt' else 'bash start.sh'
+KEYS = [('ANTHROPIC_API_KEY', 'Claude', 'sk-ant-'), ('GROQ_API_KEY', 'Groq', 'gsk_')]
 
 
 def step(number, text):
@@ -75,28 +76,42 @@ def prepare_env():
                 added.append(key.strip())
     if added:
         print('Added missing settings to .env:', ', '.join(added))
-    if read_env().get('ANTHROPIC_API_KEY'):
-        print('The Claude API key is already in .env.')
-        return
-    print('Speako needs a Claude API key. Your team lead gives it to you privately.')
-    print('Typing is hidden. Paste the key, then press Enter.')
-    key = getpass.getpass('Claude API key: ').strip()
-    if not key.startswith('sk-ant-'):
-        stop('that does not look like a Claude API key (it must start with sk-ant-).')
-    set_env_value('ANTHROPIC_API_KEY', key)
-    print('Saved the key in .env. Git ignores this file, so the key never goes to GitHub.')
+    for setting, name, prefix in KEYS:
+        if read_env().get(setting):
+            print(f'The {name} API key is already in .env.')
+            continue
+        print(f'Speako needs a {name} API key. Your team lead gives it to you privately.')
+        print('Typing is hidden. Paste the key, then press Enter.')
+        key = getpass.getpass(f'{name} API key: ').strip()
+        if not key.startswith(prefix):
+            stop(f'that does not look like a {name} API key (it must start with {prefix}).')
+        set_env_value(setting, key)
+        print('Saved the key in .env. Git ignores this file, so the key never goes to GitHub.')
 
 
-def check_key():
+def check_keys():
+    import urllib.error
+    import urllib.request
     import anthropic
-    key = read_env().get('ANTHROPIC_API_KEY', '')
+    env = read_env()
     try:
-        anthropic.Anthropic(api_key=key, timeout=20.0, max_retries=1).models.list(limit=1)
+        anthropic.Anthropic(api_key=env.get('ANTHROPIC_API_KEY', ''), timeout=20.0, max_retries=1).models.list(limit=1)
         print('The Claude API key works.')
     except anthropic.AuthenticationError:
         stop('Claude rejected the API key. Remove the ANTHROPIC_API_KEY value from .env and run the setup again.')
     except Exception as exc:  # A network problem must not block the rest of the setup.
-        print(f'Could not check the key now ({type(exc).__name__}). Setup continues; check your internet connection.')
+        print(f'Could not check the Claude key now ({type(exc).__name__}). Setup continues; check your internet connection.')
+    request = urllib.request.Request('https://api.groq.com/openai/v1/models', headers={
+        'Authorization': f"Bearer {env.get('GROQ_API_KEY', '')}", 'User-Agent': 'speako'})
+    try:
+        urllib.request.urlopen(request, timeout=20).read()
+        print('The Groq API key works.')
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            stop('Groq rejected the API key. Remove the GROQ_API_KEY value from .env and run the setup again.')
+        print(f'Could not check the Groq key now (HTTP {exc.code}). Setup continues.')
+    except Exception as exc:
+        print(f'Could not check the Groq key now ({type(exc).__name__}). Setup continues; check your internet connection.')
 
 
 def download_speech_model():
@@ -118,15 +133,15 @@ def main():
     step(1, 'Install the Python packages (the first time takes a few minutes)')
     run('-m', 'pip', 'install', '--quiet', '--disable-pip-version-check', '-r', 'requirements.txt')
     print('The packages are installed.')
-    step(2, 'Create .env and add the Claude API key')
+    step(2, 'Create .env and add the API keys')
     prepare_env()
-    step(3, 'Check the Claude API key')
-    check_key()
+    step(3, 'Check the API keys')
+    check_keys()
     step(4, 'Create the database and the lessons')
     run('manage.py', 'migrate', '--noinput')
     step(5, 'Create the demo accounts')
     run('manage.py', 'seed_demo_users', env={**os.environ, 'SPEAKO_DEMO_PASSWORD': DEMO_PASSWORD})
-    step(6, 'Download the speech-to-text model')
+    step(6, 'Download the backup speech-to-text model')
     download_speech_model()
     print('\nSetup is complete.')
     print(f'Start Speako with: {START}')

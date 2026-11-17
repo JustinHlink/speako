@@ -5,3 +5,5 @@ tzdata==2026.5
 faster-whisper==1.2.1
 av==13.1.0
 anthropic==2.9.0
+gunicorn==27.0.1
+whitenoise==6.12.0
