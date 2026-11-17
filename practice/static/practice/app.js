@@ -31,7 +31,7 @@ function usage(data) {
   $('guard').textContent=`$${(data.guard_usd+data.external_spend_usd).toFixed(2)} / $${data.budget_usd.toFixed(2)}`;
   $('attempts').textContent=data.attempts;
   $('tokens').textContent=(data.prompt_tokens+data.output_tokens).toLocaleString();
-  $('billing-note').textContent=data.billing_note+' $0.02 minimum guard per attempt, including failures. Do not enable provider billing.';
+  $('billing-note').textContent=data.billing_note+' $0.02 minimum guard per attempt, including failures.';
 }
 function error(message='') { $('error').textContent=message; $('error').hidden=!message; }
 function csrf() {return document.cookie.split('; ').find(v=>v.startsWith('csrftoken='))?.split('=')[1] || '';}
