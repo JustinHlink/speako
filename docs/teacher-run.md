@@ -1,8 +1,8 @@
 # Speako: instructor demo setup
 
-Sprint 4 version: the **develop** branch
+Submission version: **submission-sprint4-2026-11-18**
 
-Speako runs on your own computer. The GitHub page holds the source code, not a hosted app. The Sprint 3 tag `submission-sprint3-2026-11-04-r3` stays unchanged. This guide covers the Sprint 4 version, which adds the one-step setup, the customs lesson, reply flags and the reviewer page.
+Speako runs on your own computer. The GitHub page holds the source code, not a hosted app. This tag holds the tested Sprint 4 version, which adds the one-step setup, the customs lesson, reply flags and the reviewer page. The Sprint 3 tag `submission-sprint3-2026-11-04-r3` stays unchanged.
 
 ## 1. Requirements
 
@@ -14,14 +14,16 @@ Speako runs on your own computer. The GitHub page holds the source code, not a h
 
 ## 2. Download this version
 
-**Without Git:** download the [develop ZIP file](https://github.com/JustinHlink/speako/archive/refs/heads/develop.zip) and extract it. Open the folder that contains `manage.py`, `setup.bat` and `setup.sh`.
+**Without Git:** download the [submission ZIP file](https://github.com/JustinHlink/speako/archive/refs/tags/submission-sprint4-2026-11-18.zip) and extract it. Open the folder that contains `manage.py`, `setup.bat` and `setup.sh`.
 
 **With Git:**
 
 ```text
-git clone --branch develop https://github.com/JustinHlink/speako.git speako-demo
+git clone --branch submission-sprint4-2026-11-18 https://github.com/JustinHlink/speako.git speako-demo
 cd speako-demo
 ```
+
+Use this tag, not a branch. A branch keeps changing after the submission.
 
 ## 3. Install and configure: Windows
 
