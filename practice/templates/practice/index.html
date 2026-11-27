@@ -5,13 +5,34 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Speako · Restaurant practice</title>
   <link rel="stylesheet" href="{% static 'practice/app.css' %}">
+  <style>
+    .message.reviewer-incorrect {
+      background: rgba(225, 55, 55, 0.14);
+      border: 1.5px solid rgba(205, 45, 45, 0.45);
+      color: var(--ink);
+    }
+    .message.reviewer-incorrect .speaker {
+      color: var(--red);
+    }
+    .incorrect-review-badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(205, 45, 45, 0.16);
+      color: var(--red);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.4px;
+    }
+  </style>
   <script defer src="{% static 'practice/protocol.js' %}"></script>
   <script defer src="{% static 'practice/speech.js' %}"></script>
   <script defer src="{% static 'practice/map.js' %}"></script>
   <script defer src="{% static 'practice/app.js' %}"></script>
 </head>
 <body>
-  <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><span class="local-badge">Local practice</span></header>
+  <header><a class="brand" href="/">speako<span class="brand-dot">●</span></a><span class="header-label">English speaking practice</span><a href="/map/" class="secondary" style="margin-left:auto;text-decoration:none;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:600;">← Learning map</a><span class="local-badge" style="margin-left:10px;">Local practice</span></header>
   <main>
     <div class="intro"><div><p class="eyebrow">ONE SMALL CONVERSATION. MORE CONFIDENCE.</p><h1>Let's order something.</h1><p class="subtitle">Practice a simple restaurant conversation, one turn at a time.</p></div><div class="timing" id="time-page_ready">Page ready · — / target ≤ 1.5 s</div></div>
     <section class="setup" aria-label="Account">
@@ -22,11 +43,12 @@
         <button type="submit" class="secondary">Sign in</button>
       </form>
       {% if user.is_authenticated and user.role == "Reviewer" %}<p><a href="/review/">Open review queue</a></p>{% endif %}
+      {% if user.is_authenticated and user.role == "Learner" %}<p><a href="/map/">Open learning map</a></p>{% endif %}
       <button id="sign-out" class="secondary" hidden>Sign out</button>
     </section>
     <div id="setup" class="setup" role="status" hidden></div>
-    <section class="lesson-card" aria-label="Learning map"><h2>Choose a lesson</h2><div id="lesson-list" class="row"></div><p id="map-status" role="status" hidden></p><button id="map-retry" class="secondary" hidden>Retry loading lessons</button></section>
-    <div class="workspace">
+    <section id="practice-map-bar" class="lesson-card" aria-label="Learning map"><h2>Choose a lesson</h2><div id="lesson-list" class="row"></div><p id="map-status" role="status" hidden></p><button id="map-retry" class="secondary" hidden>Retry loading lessons</button></section>
+    <div id="practice-workspace" class="workspace">
       <aside class="lesson-card">
         <div class="restaurant-icon" aria-hidden="true">☕</div><p class="eyebrow">YOUR SCENARIO</p><h2 id="lesson-title">Ordering at a Restaurant</h2>
         <p id="goal">Order food and a drink politely, then ask for the bill.</p>

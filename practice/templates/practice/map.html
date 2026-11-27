@@ -1,0 +1,204 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speako · Learning map</title>
+  <link rel="stylesheet" href="{% static 'practice/app.css' %}">
+  <style>
+    .map-overview {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+    .map-stat-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 20px;
+    }
+    .map-stat-card span {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+    }
+    .map-stat-card strong {
+      display: block;
+      font-size: 28px;
+      margin-top: 4px;
+      color: var(--ink);
+    }
+    .map-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      align-items: stretch;
+      margin-top: 16px;
+    }
+    @media (max-width: 1024px) {
+      .map-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .map-overview { grid-template-columns: 1fr; }
+      .map-grid { grid-template-columns: 1fr; }
+    }
+    .map-lesson-card {
+      border: 1.5px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    .map-lesson-card:hover {
+      border-color: var(--green);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(23, 110, 92, 0.1);
+    }
+    .map-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .map-step-badge {
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 1px;
+      color: var(--green);
+      text-transform: uppercase;
+    }
+    .map-status-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .map-status-badge.completed {
+      background: #e3f4ea;
+      color: var(--green);
+    }
+    .map-status-badge.in-progress {
+      background: #fff3dd;
+      color: var(--amber);
+    }
+    .map-status-badge.not-started {
+      background: #f1f3f0;
+      color: var(--muted);
+    }
+    .map-card-title {
+      font-size: 20px;
+      margin: 4px 0 6px;
+    }
+    .map-card-goal {
+      font-size: 14px;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    .map-card-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 10px;
+    }
+    .map-card-actions button {
+      flex: 1;
+    }
+    .recap-turn-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .recap-turn-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .recap-turn-item.reviewer-incorrect {
+      background: rgba(225, 55, 55, 0.14);
+      border: 1.5px solid rgba(205, 45, 45, 0.45);
+      color: var(--red);
+    }
+    .recap-turn-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .incorrect-review-badge {
+      background: rgba(205, 45, 45, 0.16);
+      color: var(--red);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 750;
+    }
+  </style>
+  <script defer src="{% static 'practice/protocol.js' %}"></script>
+  <script defer src="{% static 'practice/map_page.js' %}"></script>
+</head>
+<body>
+  <header>
+    <a class="brand" href="/map/">speako<span class="brand-dot">●</span></a>
+    <span class="header-label">Learning map</span>
+    <a href="/" class="secondary" style="margin-left:auto;text-decoration:none;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:600;">Practice workspace →</a>
+    <span class="local-badge" style="margin-left:10px;">Local practice</span>
+  </header>
+  <main>
+    <div class="intro">
+      <div>
+        <p class="eyebrow">LEARNING MAP</p>
+        <h1>Choose your speaking scenario.</h1>
+        <p class="subtitle">Track your lesson progress, review vocabulary goals, and jump into a conversation.</p>
+      </div>
+    </div>
+
+    <section class="setup" aria-label="Account">
+      <p id="account-name">{% if user.is_authenticated %}Signed in as {{ user.username }}{% else %}Sign in to practice{% endif %}</p>
+      <form id="sign-in-form"{% if user.is_authenticated %} hidden{% endif %}>
+        <label>Username <input id="username" autocomplete="username" required></label>
+        <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="secondary">Sign in</button>
+      </form>
+      <p id="review-link-row"{% if not user.is_authenticated or user.role != "Reviewer" %} hidden{% endif %}><a href="/review/">Open review queue</a></p>
+      <button id="sign-out" class="secondary"{% if not user.is_authenticated %} hidden{% endif %}>Sign out</button>
+    </section>
+
+    <div id="map-error" class="error" role="alert" style="margin:0 0 20px;" hidden></div>
+
+    <section id="map-overview" class="map-overview" aria-label="Progress overview" hidden>
+      <div class="map-stat-card"><span>Total scenarios</span><strong id="stat-total">0</strong></div>
+      <div class="map-stat-card"><span>Completed</span><strong id="stat-completed">0</strong></div>
+      <div class="map-stat-card"><span>In progress</span><strong id="stat-in-progress">0</strong></div>
+      <div class="map-stat-card"><span>Not started</span><strong id="stat-not-started">0</strong></div>
+    </section>
+
+    <div id="map-summary-panel" class="summary" style="margin:0 0 24px;" hidden></div>
+
+    <section aria-label="Learning map lessons">
+      <div id="map-lessons-header" class="row" hidden>
+        <h2 style="margin:0;">Available lessons</h2>
+        <button id="map-refresh" class="secondary">Refresh map</button>
+      </div>
+      <p id="map-status" role="status" style="color:var(--muted);font-size:14px;"></p>
+      <button id="map-retry" class="secondary" hidden>Retry loading lessons</button>
+      <div id="map-grid" class="map-grid" hidden></div>
+    </section>
+  </main>
+</body>
+</html>

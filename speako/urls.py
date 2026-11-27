@@ -3,6 +3,7 @@ from practice import views, reviewer
 
 urlpatterns = [
     path('', views.home),
+    path('map/', views.map_page),
     path('review/', reviewer.page),
 
     path('api/auth/login/', views.api_login),

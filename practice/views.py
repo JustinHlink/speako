@@ -29,7 +29,7 @@ def error(status, code, message):
 
 
 def attempt_snapshot(attempt):
-    turns = attempt.turns.select_related('correction').order_by('turn_number')
+    turns = attempt.turns.select_related('correction', 'flag').order_by('turn_number')
     return {
         'attempt_id': str(attempt.id),
         'lesson_id': attempt.lesson_id,
@@ -70,11 +70,14 @@ def lesson_progress(learner, lesson):
 
 def turn_snapshot(turn):
     correction = getattr(turn, 'correction', None)
+    flag = getattr(turn, 'flag', None)
     return {
         'number': turn.turn_number,
         'learner': turn.learner_text,
         'reply': turn.ai_reply,
         'correction': {'explanation': correction.explanation, 'example': correction.corrected_example} if correction else None,
+        'flag_status': flag.status if flag else None,
+        'review_incorrect': bool(flag and flag.status == 'Incorrect'),
     }
 
 
@@ -120,6 +123,13 @@ def require_role(allowed_roles):
 def home(request):
     """Render the single-page application template."""
     return render(request, 'practice/index.html')
+
+
+@require_GET
+@ensure_csrf_cookie
+def map_page(request):
+    """Render the dedicated Learning Map page with integrated sign-in component."""
+    return render(request, 'practice/map.html')
 
 
 @require_POST
@@ -233,17 +243,20 @@ def list_lessons(request):
     L01: GET /api/lessons/
     Return all Published lessons with map status computed per learner (DR-03).
     """
-    published_lessons = list(Lesson.objects.filter(status='Published').order_by('id'))
+    published_lessons = list(Lesson.objects.filter(status='Published').prefetch_related('words').order_by('id'))
     statuses = progress.map_statuses(request.user, published_lessons)
 
     lessons_data = []
     for l in published_lessons:
+        last_completed = progress.latest_completed_attempt(request.user, l) if statuses[l.id] == 'Completed' else None
         lessons_data.append({
             'id': l.id,
             'scenario': l.scenario,
             'grammar_goal': l.grammar_goal,
             'turn_limit': l.turn_limit,
-            'status_on_map': statuses[l.id]
+            'target_words': [w.word for w in l.words.all()],
+            'status_on_map': statuses[l.id],
+            'last_completed_attempt_id': str(last_completed.id) if last_completed else None,
         })
 
     return JsonResponse({'lessons': lessons_data})
@@ -517,7 +530,7 @@ def get_summary(request, attempt_id):
     summary = saved_summary(attempt) if attempt else None
     if summary is None:
         return error(404, 'NOT_FOUND', 'Lesson summary not found.')
-    return JsonResponse({'summary': summary})
+    return JsonResponse({'summary': summary, 'attempt': attempt_snapshot(attempt)})
 
 
 @require_POST
